@@ -2,20 +2,20 @@ const std = @import("std");
 
 pub const vga = @import("x86/vga.zig");
 
-pub fn read_cr3() u64 {
+pub inline fn read_cr3() u64 {
     return asm volatile ("movq %%cr3, %[ret]"
         : [ret] "=rax" (-> u64)
     );
 }
 
-pub fn write_cr3(value: u64) void {
+pub inline fn write_cr3(value: u64) void {
     asm volatile ("movq %%rax, %%cr3"
         :
         : [value] "{rax}" (value)
     );
 }
 
-pub fn out(comptime T: type, address: u16, value: T) void {
+pub inline fn out(comptime T: type, address: u16, value: T) void {
     switch (T) {
         u8 => asm volatile ("out %%al, %%dx"
             :
@@ -36,7 +36,7 @@ pub fn out(comptime T: type, address: u16, value: T) void {
     }
 }
 
-pub fn in(comptime T: type, address: u16, value: T) T {
+pub inline fn in(comptime T: type, address: u16, value: T) T {
     switch (T) {
         u8 => asm volatile ("in %%dx, %%al"
             : [ret] "={al}" (-> u8)
