@@ -1,6 +1,7 @@
 const std = @import("std");
 
 pub const vga = @import("x86/vga.zig");
+pub const serial = @import("x86/serial.zig");
 
 pub inline fn read_cr3() u64 {
     return asm volatile ("movq %%cr3, %[ret]"
