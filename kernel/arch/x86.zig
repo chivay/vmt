@@ -15,6 +15,42 @@ pub fn write_cr3(value: u64) void {
     );
 }
 
+pub fn out(comptime T: type, address: u16, value: T) void {
+    switch (T) {
+        u8 => asm volatile ("out %%al, %%dx"
+            :
+            : [address] "{dx}" (address),
+              [value] "{al}" (value)
+        ),
+        u16 => asm volatile ("out %%ax, %%dx"
+            :
+            : [address] "{dx}" (address),
+              [value] "{ax}" (value)
+        ),
+        u32 => asm volatile ("out %%eax, %%dx"
+            :
+            : [address] "dx" (address),
+              [value] "{eax}" (value)
+        ),
+        else => @compileError("Invalid write type"),
+    }
+}
+
+pub fn in(comptime T: type, address: u16, value: T) T {
+    switch (T) {
+        u8 => asm volatile ("in %%dx, %%al"
+            : [ret] "={al}" (-> u8)
+        ),
+        u16 => asm volatile ("in %%dx, %%ax"
+            : [ret] "={ax}" (-> u16)
+        ),
+        u32 => asm volatile ("in %%dx, %%eax"
+            : [ret] "={ax}" (-> u32)
+        ),
+        else => @compileError("Invalid read type"),
+    }
+}
+
 pub const CPUIDInfo = packed struct {
     eax: u32,
     ebx: u32,
