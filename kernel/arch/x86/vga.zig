@@ -62,6 +62,12 @@ pub const VGAConsole = struct {
             self.cursor_x = 0;
             return;
         }
+
+        if (c == '\r') {
+            self.cursor_x = 0;
+            return;
+        }
+
         VGADevice.put_at(c, self.cursor_x, self.cursor_y);
 
         self.cursor_x += 1;
