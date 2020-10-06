@@ -1,6 +1,8 @@
 const io = @import("std").io;
 const os = @import("std").os;
 
+const x86 = @import("../x86.zig");
+
 pub const VGADevice = struct {
     const VGA_WIDTH = 80;
     const VGA_HEIGHT = 25;
@@ -33,6 +35,11 @@ pub const VGADevice = struct {
             }
         }
     }
+
+    pub fn disable_cursor() void {
+        x86.out(u8, 0x3D4, 0x0A);
+        x86.out(u8, 0x3D5, 0x20);
+    }
 };
 
 pub const VGAConsole = struct {
@@ -41,6 +48,7 @@ pub const VGAConsole = struct {
 
     pub fn init() VGAConsole {
         VGADevice.clear();
+        VGADevice.disable_cursor();
         return VGAConsole{
             .cursor_x = 0,
             .cursor_y = 0,
