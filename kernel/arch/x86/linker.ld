@@ -1,0 +1,21 @@
+ENTRY(multiboot_start)
+
+SECTIONS
+{
+
+    . = 1M;
+    kernel_boot_start = .;
+    .multiboot : { KEEP(*(.multiboot)) }
+    .boot.text : { *(.boot.text) }
+    .boot.data : { *(.boot.data) }
+    .boot.bss : { *(.boot.bss) }
+    .boot.stack : { *(.boot.stack) }
+    . = ALIGN(0x1000);
+    kernel_boot_end = .;
+    . += 0xFFFFFFFF80000000;
+
+    .text : AT(kernel_boot_end) { *(.text) }
+    .data : AT((LOADADDR(.text) + SIZEOF(.text) + 0xFFF) & 0xFFFFFFFFFFFFF000) { *(.data) }
+    .bss : AT((LOADADDR(.data) + SIZEOF(.data) + 0xFFF) & 0xFFFFFFFFFFFFF000) { *(.bss) }
+
+}
