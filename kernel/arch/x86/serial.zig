@@ -11,11 +11,13 @@ pub fn SerialPort(comptime id: u8) type {
     return struct {
         const PORT_BASE = PORT_BASES[id - 1];
 
+        const Self = @This();
+
         const SerialError = error{SerialError};
-        pub const OutStream = io.OutStream(bool, SerialError, write);
+        pub const OutStream = io.OutStream(Self, SerialError, write);
 
         pub fn outStream() OutStream {
-            return .{ .context = true };
+            return .{ .context = Self{} };
         }
 
         pub fn init() void {
@@ -33,13 +35,13 @@ pub fn SerialPort(comptime id: u8) type {
             //x86.out(u8, PORT_BASE + 4, 0x0b);
         }
 
-        pub inline fn write_char(c: u8) void {
+        pub inline fn write_char(self: Self, c: u8) void {
             x86.out(u8, PORT_BASE, c);
         }
 
-        pub fn write(a: bool, data: []const u8) SerialError!usize {
+        pub fn write(self: Self, data: []const u8) SerialError!usize {
             for (data) |c| {
-                @This().write_char(c);
+                self.write_char(c);
             }
             return data.len;
         }
