@@ -37,6 +37,7 @@ pub fn build(b: *Builder) void {
             .nopl,
             .slow_3ops_lea,
             .slow_incdec,
+            .sse,
             .sse2,
             .vzeroupper,
             .x87,
