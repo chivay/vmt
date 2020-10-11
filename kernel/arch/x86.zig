@@ -19,3 +19,22 @@ pub fn hang() noreturn {
         hlt();
     }
 }
+
+pub fn MSR(n: u32) type {
+    return struct {
+        pub inline fn read() u64 {
+            return rdmsr(n);
+        }
+        pub inline fn write(value: u64) void {
+            wrmsr(n, value);
+        }
+    };
+}
+
+pub const APIC_BASE = MSR(0x0000_001B);
+pub const EFER = MSR(0xC000_0080);
+pub const LSTAR = MSR(0xC000_0082);
+
+pub const FSBASE = MSR(0xC000_0100);
+pub const GSBASE = MSR(0xC000_0101);
+pub const KERNEL_GSBASE = MSR(0xC000_0102);
