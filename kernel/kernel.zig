@@ -15,6 +15,6 @@ export fn kmain() void {
     vga_console = VGAConsole.init();
 
     printk("Booting the kernel...\n", .{});
-    printk("CR3: 0x{x}\n", .{x86.read_cr3()});
+    printk("CR3: 0x{x}\n", .{x86.CR3.read()});
     printk("CPU Vendor: {}\n", .{x86.get_vendor_string()});
 }
