@@ -19,11 +19,16 @@ comptime {
     assert(@sizeOf(TSS) == 104);
 }
 
+pub const PrivilegeLevel = enum(u2) {
+    Ring0 = 0,
+    Ring3 = 3,
+};
+
 pub const SegmentSelector = struct {
     raw: u16,
 
-    pub fn new(index: u16, rpl: u2) SegmentSelector {
-        return SegmentSelector{ .raw = index << 3 | rpl };
+    pub fn new(index: u16, rpl: PrivilegeLevel) SegmentSelector {
+        return SegmentSelector{ .raw = index << 3 | @enumToInt(rpl) };
     }
 };
 
@@ -89,8 +94,7 @@ pub fn GlobalDescriptorTable(n: u16) type {
             self.entries[self.free_slot] = entry;
             self.free_slot += 1;
 
-            // TODO
-            const dpl = 0;
+            const dpl = @intToEnum(PrivilegeLevel, @intCast(u2, (entry.raw >> 45) & 0b11));
             return SegmentSelector.new(self.free_slot - 1, dpl);
         }
 
