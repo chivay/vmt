@@ -23,7 +23,7 @@ pub usingnamespace CpuFeature.feature_set_fns(std.Target.x86.Feature);
 
 pub fn build(b: *Builder) void {
     const arch = Arch.x86_64;
-    _ = b.standardReleaseOptions();
+    const mode = b.standardReleaseOptions();
 
     const cross_target = CrossTarget{
         .cpu_arch = arch,
@@ -37,6 +37,7 @@ pub fn build(b: *Builder) void {
             .nopl,
             .slow_3ops_lea,
             .slow_incdec,
+            .sse,
             .sse2,
             .vzeroupper,
             .x87,
@@ -47,6 +48,8 @@ pub fn build(b: *Builder) void {
     };
 
     const kernel = b.addExecutable("kernel", "kernel/kernel.zig");
+    kernel.setBuildMode(mode);
+    kernel.code_model = builtin.CodeModel.kernel;
     buildArch(kernel, arch);
 
     kernel.setTarget(cross_target);

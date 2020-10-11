@@ -1,101 +1,111 @@
 const std = @import("std");
+const assert = std.debug.assert;
+usingnamespace @import("x86/asm.zig");
 
 pub const vga = @import("x86/vga.zig");
 pub const serial = @import("x86/serial.zig");
 
-pub inline fn read_cr3() u64 {
-    return asm volatile ("movq %%cr3, %[ret]"
-        : [ret] "=rax" (-> u64)
-    );
-}
-
-pub inline fn write_cr3(value: u64) void {
-    asm volatile ("movq %%rax, %%cr3"
-        :
-        : [value] "{rax}" (value)
-    );
-}
-
-pub inline fn out(comptime T: type, address: u16, value: T) void {
-    switch (T) {
-        u8 => asm volatile ("out %%al, %%dx"
-            :
-            : [address] "{dx}" (address),
-              [value] "{al}" (value)
-        ),
-        u16 => asm volatile ("out %%ax, %%dx"
-            :
-            : [address] "{dx}" (address),
-              [value] "{ax}" (value)
-        ),
-        u32 => asm volatile ("out %%eax, %%dx"
-            :
-            : [address] "dx" (address),
-              [value] "{eax}" (value)
-        ),
-        else => @compileError("Invalid write type"),
-    }
-}
-
-pub inline fn in(comptime T: type, address: u16, value: T) T {
-    switch (T) {
-        u8 => asm volatile ("in %%dx, %%al"
-            : [ret] "={al}" (-> u8)
-        ),
-        u16 => asm volatile ("in %%dx, %%ax"
-            : [ret] "={ax}" (-> u16)
-        ),
-        u32 => asm volatile ("in %%dx, %%eax"
-            : [ret] "={ax}" (-> u32)
-        ),
-        else => @compileError("Invalid read type"),
-    }
-}
-
-pub const CPUIDInfo = packed struct {
-    eax: u32,
-    ebx: u32,
-    ecx: u32,
-    edx: u32,
-
-    fn to_bytes(self: @This()) [16]u8 {
-        var output: [16]u8 = undefined;
-
-        std.mem.copy(u8, output[0..4], std.mem.toBytes(self.eax)[0..]);
-        std.mem.copy(u8, output[4..8], std.mem.toBytes(self.ebx)[0..]);
-        std.mem.copy(u8, output[8..12], std.mem.toBytes(self.ecx)[0..]);
-        std.mem.copy(u8, output[12..16], std.mem.toBytes(self.edx)[0..]);
-
-        return output;
-    }
+pub const TSS = packed struct {
+    _reserved1: u32,
+    rsp: [3]u64,
+    _reserved2: u32,
+    _reserved3: u32,
+    ist: [8]u64,
+    _reserved4: u16,
+    io_map_addr: u16,
 };
 
 comptime {
-    asm (
-        \\.type __cpuid @function;
-        \\__cpuid:
-        \\  mov %esi, %eax
-        \\  mov %edx, %ecx
-        \\  cpuid
-        \\  mov %eax, 0(%rdi)
-        \\  mov %ebx, 4(%rdi)
-        \\  mov %ecx, 8(%rdi)
-        \\  mov %edx, 12(%rdi)
-        \\  retq 
-    );
+    assert(@sizeOf(TSS) == 104);
 }
 
-// Implicit C calling convention ?
-extern fn __cpuid(
-    info: *CPUIDInfo, // rdi
-    leaf: u32, // esi
-    subleaf: u32, // edx
-) void;
+pub const SegmentSelector = struct {
+    raw: u16,
 
-pub fn cpuid(leaf: u32, subleaf: u32) CPUIDInfo {
-    var info: CPUIDInfo = undefined;
-    __cpuid(&info, leaf, subleaf);
-    return info;
+    pub fn new(index: u16, rpl: u2) SegmentSelector {
+        return SegmentSelector{ .raw = index << 3 | rpl };
+    }
+};
+
+pub const GDTEntry = packed struct {
+    raw: u64,
+
+    const WRITABLE = 1 << 41;
+    const CONFORMING = 1 << 42;
+    const EXECUTABLE = 1 << 43;
+    const USER = 1 << 44;
+    const RING_3 = 3 << 45;
+    const PRESENT = 1 << 47;
+    const LONG_MODE = 1 << 53;
+    const DEFAULT_SIZE = 1 << 54;
+    const GRANULARITY = 1 << 55;
+
+    const LIMIT_LO = 0xffff;
+    const LIMIT_HI = 0xf << 48;
+
+    const ORDINARY = USER | PRESENT | WRITABLE | LIMIT_LO | LIMIT_HI | GRANULARITY;
+
+    pub const nil = GDTEntry{ .raw = 0 };
+    pub const KernelData = GDTEntry{ .raw = ORDINARY | DEFAULT_SIZE };
+    pub const KernelCode = GDTEntry{ .raw = ORDINARY | EXECUTABLE | LONG_MODE };
+    pub const UserCode = GDTEntry{ .raw = KernelCode.raw | RING_3 };
+    pub const UserData = GDTEntry{ .raw = KernelData.raw | RING_3 };
+
+    pub fn TaskState(tss: *TSS) [2]GDTEntry {
+        var high: u64 = 0;
+        var ptr = @ptrToInt(tss);
+
+        var low: u64 = 0;
+        low |= PRESENT;
+        // 64 bit available TSS;
+        low |= 0b1001 << 40;
+        // set limit
+        low |= (@sizeOf(TSS) - 1) & 0xffff;
+
+        // set pointer
+        // 0..23 bits
+        low |= (ptr & 0x7fffff) << 16;
+
+        // high bits part
+        high |= (ptr & 0xffffffff00000000) >> 32;
+        return [2]GDTEntry{ GDTEntry{ .raw = low }, GDTEntry{ .raw = high } };
+    }
+};
+
+pub fn GlobalDescriptorTable(n: u16) type {
+    return packed struct {
+        entries: [n]GDTEntry align(0x10),
+        free_slot: u16,
+
+        const Self = @This();
+
+        pub fn new() Self {
+            var gdt = Self{ .entries = std.mem.zeroes([n]GDTEntry), .free_slot = 0 };
+            return gdt;
+        }
+
+        pub fn add_entry(self: *Self, entry: GDTEntry) SegmentSelector {
+            assert(self.free_slot < n);
+            self.entries[self.free_slot] = entry;
+            self.free_slot += 1;
+
+            // TODO
+            const dpl = 0;
+            return SegmentSelector.new(self.free_slot - 1, dpl);
+        }
+
+        pub fn load(self: Self) void {
+            const init = packed struct {
+                    size: u16,
+                    base: u64,
+                }{
+                .base = @ptrToInt(&self.entries),
+                .size = @sizeOf(@TypeOf(self.entries)) - 1,
+            };
+
+            lgdt(@ptrToInt(&init));
+        }
+    };
 }
 
 pub fn get_vendor_string() [12]u8 {
@@ -106,3 +116,29 @@ pub fn get_vendor_string() [12]u8 {
     std.mem.copy(u8, result[0..], std.mem.sliceAsBytes(vals[0..]));
     return result;
 }
+
+pub fn hang() noreturn {
+    while (true) {
+        cli();
+        hlt();
+    }
+}
+
+pub fn MSR(n: u32) type {
+    return struct {
+        pub inline fn read() u64 {
+            return rdmsr(n);
+        }
+        pub inline fn write(value: u64) void {
+            wrmsr(n, value);
+        }
+    };
+}
+
+pub const APIC_BASE = MSR(0x0000_001B);
+pub const EFER = MSR(0xC000_0080);
+pub const LSTAR = MSR(0xC000_0082);
+
+pub const FSBASE = MSR(0xC000_0100);
+pub const GSBASE = MSR(0xC000_0101);
+pub const KERNEL_GSBASE = MSR(0xC000_0102);
