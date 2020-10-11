@@ -12,3 +12,10 @@ pub fn get_vendor_string() [12]u8 {
     std.mem.copy(u8, result[0..], std.mem.sliceAsBytes(vals[0..]));
     return result;
 }
+
+pub fn hang() noreturn {
+    while (true) {
+        cli();
+        hlt();
+    }
+}
