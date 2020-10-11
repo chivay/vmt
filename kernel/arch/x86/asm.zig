@@ -124,6 +124,13 @@ pub inline fn sti() void {
     asm volatile ("sti");
 }
 
+pub inline fn lidt(addr: u64) void {
+    asm volatile ("lidt (%[addr])"
+        :
+        : [addr] "{rdi}" (addr)
+    );
+}
+
 pub inline fn set_ds(selector: u16) void {
     asm volatile ("movl %[selector], %%ds"
         :
