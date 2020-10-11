@@ -1,3 +1,49 @@
+comptime {
+    asm (
+        \\.type __cpuid @function;
+        \\__cpuid:
+        \\  mov %esi, %eax
+        \\  mov %edx, %ecx
+        \\  cpuid
+        \\  mov %eax, 0(%rdi)
+        \\  mov %ebx, 4(%rdi)
+        \\  mov %ecx, 8(%rdi)
+        \\  mov %edx, 12(%rdi)
+        \\  retq
+    );
+}
+
+pub const CPUIDInfo = packed struct {
+    eax: u32,
+    ebx: u32,
+    ecx: u32,
+    edx: u32,
+
+    fn to_bytes(self: @This()) [16]u8 {
+        var output: [16]u8 = undefined;
+
+        std.mem.copy(u8, output[0..4], std.mem.toBytes(self.eax)[0..]);
+        std.mem.copy(u8, output[4..8], std.mem.toBytes(self.ebx)[0..]);
+        std.mem.copy(u8, output[8..12], std.mem.toBytes(self.ecx)[0..]);
+        std.mem.copy(u8, output[12..16], std.mem.toBytes(self.edx)[0..]);
+
+        return output;
+    }
+};
+
+// Implicit C calling convention ?
+extern fn __cpuid(
+    info: *CPUIDInfo, // rdi
+    leaf: u32, // esi
+    subleaf: u32, // edx
+) void;
+
+pub fn cpuid(leaf: u32, subleaf: u32) CPUIDInfo {
+    var info: CPUIDInfo = undefined;
+    __cpuid(&info, leaf, subleaf);
+    return info;
+}
+
 pub const CR3 = struct {
     pub inline fn read() u64 {
         return asm volatile ("movq %%cr3, %[ret]"
