@@ -120,6 +120,10 @@ pub inline fn cli() void {
     asm volatile ("cli");
 }
 
+pub inline fn sti() void {
+    asm volatile ("sti");
+}
+
 pub inline fn set_ds(selector: u16) void {
     asm volatile ("movl %[selector], %%ds"
         :
