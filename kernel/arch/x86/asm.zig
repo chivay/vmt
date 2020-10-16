@@ -94,8 +94,8 @@ pub inline fn out(comptime T: type, address: u16, value: T) void {
     }
 }
 
-pub inline fn in(comptime T: type, address: u16, value: T) T {
-    switch (T) {
+pub inline fn in(comptime T: type, address: u16) T {
+    return switch (T) {
         u8 => asm volatile ("in %[address], %[ret]"
             : [ret] "={al}" (-> u8)
             : [address] "{dx}" (address)
@@ -109,7 +109,7 @@ pub inline fn in(comptime T: type, address: u16, value: T) T {
             : [address] "dx" (address)
         ),
         else => @compileError("Invalid read type"),
-    }
+    };
 }
 
 pub inline fn hlt() void {
