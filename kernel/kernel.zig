@@ -26,6 +26,7 @@ var user_stack align(0x1000) = std.mem.zeroes([0x1000]u8);
 fn hello_handler(frame: *x86.InterruptFrame) callconv(.C) void {
     printk("Hello from interrupt\n", .{});
     printk("RIP: {x}:{x}\n", .{ frame.cs, frame.rip });
+    @panic("Nothing to do!");
 }
 
 fn init_cpu() void {
@@ -68,7 +69,7 @@ fn init_cpu() void {
 const interrupt_entry = x86.InterruptHandler(hello_handler).handler;
 
 pub fn panic(msg: []const u8, return_trace: ?*builtin.StackTrace) noreturn {
-    printk("{}\n", .{msg});
+    printk("PANIK: {}\n", .{msg});
     x86.hang();
 }
 
