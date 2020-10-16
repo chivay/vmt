@@ -144,8 +144,16 @@ pub const PrivilegeLevel = enum(u2) {
 pub const SegmentSelector = struct {
     raw: u16,
 
-    pub fn new(index: u16, rpl: PrivilegeLevel) SegmentSelector {
-        return SegmentSelector{ .raw = index << 3 | @enumToInt(rpl) };
+    pub fn new(_index: u16, _rpl: PrivilegeLevel) SegmentSelector {
+        return .{ .raw = _index << 3 | @enumToInt(_rpl) };
+    }
+
+    pub fn index(self: @This()) u16 {
+        return self.raw >> 3;
+    }
+
+    pub fn rpl(self: @This()) SegmentSelector {
+        return @intToEnum(PrivilegeLevel, self.raw & 0b11);
     }
 };
 
