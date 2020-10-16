@@ -4,6 +4,7 @@ usingnamespace @import("x86/asm.zig");
 
 pub const vga = @import("x86/vga.zig");
 pub const serial = @import("x86/serial.zig");
+pub const pic = @import("x86/pic.zig");
 
 pub const TSS = packed struct {
     _reserved1: u32,
