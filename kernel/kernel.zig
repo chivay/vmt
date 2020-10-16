@@ -20,19 +20,6 @@ var main_gdt align(64) = GDT.new();
 var main_tss align(64) = std.mem.zeroes(TSS);
 var main_idt align(64) = std.mem.zeroes(IDT);
 
-extern fn reload_cs(selector: u32) void;
-comptime {
-    asm (
-        \\ .global reload_cs;
-        \\ .type reload_cs, @function;
-        \\ reload_cs:
-        \\ pop %rsi
-        \\ push %rdi
-        \\ push %rsi
-        \\ lretq
-    );
-}
-
 var kernel_stack align(0x1000) = std.mem.zeroes([0x1000]u8);
 var user_stack align(0x1000) = std.mem.zeroes([0x1000]u8);
 
@@ -61,7 +48,8 @@ fn init_cpu() void {
     x86.set_fs(null_entry.raw);
     x86.set_gs(null_entry.raw);
     x86.set_ss(kernel_data.raw);
-    reload_cs(kernel_code.raw);
+
+    main_gdt.reload_cs(kernel_code);
 
     x86.ltr(tss_base.raw);
 
@@ -90,6 +78,6 @@ export fn kmain() void {
     printk("Booting the kernel...\n", .{});
     printk("CR3: 0x{x}\n", .{x86.CR3.read()});
     printk("CPU Vendor: {}\n", .{x86.get_vendor_string()});
+
     init_cpu();
-    printk("Reloaded GDT\n", .{});
 }

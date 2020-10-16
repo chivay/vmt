@@ -226,7 +226,24 @@ pub fn GlobalDescriptorTable(n: u16) type {
 
             lgdt(@ptrToInt(&init));
         }
+
+        pub fn reload_cs(self: Self, selector: SegmentSelector) void {
+            __reload_cs(selector.raw);
+        }
     };
+}
+
+extern fn __reload_cs(selector: u32) void;
+comptime {
+    asm (
+        \\ .global __reload_cs;
+        \\ .type __reload_cs, @function;
+        \\ __reload_cs:
+        \\ pop %rsi
+        \\ push %rdi
+        \\ push %rsi
+        \\ lretq
+    );
 }
 
 pub fn get_vendor_string() [12]u8 {
