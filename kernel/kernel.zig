@@ -1,5 +1,6 @@
 const x86 = @import("arch.zig").x86;
 const std = @import("std");
+const builtin = @import("builtin");
 const VGAConsole = x86.vga.VGAConsole;
 
 var vga_console: ?VGAConsole = null;
@@ -51,6 +52,11 @@ fn init_gdt() void {
     reload_cs(kernel_code.raw);
 
     x86.ltr(tss_base.raw);
+}
+
+pub fn panic(msg: []const u8, return_trace: ?*builtin.StackTrace) noreturn {
+    printk("{}\n", .{msg});
+    x86.hang();
 }
 
 export fn kmain() void {
