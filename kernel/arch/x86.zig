@@ -6,6 +6,122 @@ pub const vga = @import("x86/vga.zig");
 pub const serial = @import("x86/serial.zig");
 pub const pic = @import("x86/pic.zig");
 
+pub const InterruptDescriptorTable = packed struct {
+    entries: [256]IDTEntry,
+
+    const Self = @This();
+
+    pub fn set_entry(self: *Self, which: u16, entry: IDTEntry) void {
+        self.entries[which] = entry;
+    }
+
+    pub fn load(self: Self) void {
+        const init = packed struct {
+                size: u16,
+                base: u64,
+            }{
+            .base = @ptrToInt(&self.entries),
+            .size = @sizeOf(@TypeOf(self.entries)) - 1,
+        };
+
+        lidt(@ptrToInt(&init));
+    }
+};
+
+pub const InterruptFrame = packed struct {
+    rip: u64,
+    cs: u64,
+    flags: u64,
+    rsp: u64,
+    ss: u64,
+};
+
+comptime {
+    assert(@sizeOf(InterruptFrame) == 40);
+}
+
+pub const IntHandler = fn (*InterruptFrame) callconv(.C) void;
+pub const IntHandlerError = fn (*InterruptFrame) callconv(.C) void;
+
+pub fn InterruptHandler(func: IntHandler) type {
+    return struct {
+        pub fn handler() callconv(.Naked) void {
+            // Save registers
+            asm volatile (
+                \\ push %%rax
+                \\ push %%rcx
+                \\ push %%rdx
+                \\ push %%rdi
+                \\ push %%rsi
+                \\ push %%r8
+                \\ push %%r9
+                \\ push %%r10
+                \\ push %%r11
+                :
+                :
+                : "rsp"
+            );
+            // RSP is pointing to the beginning of the
+            // interrupt frame
+            var frame = asm volatile ("lea 72(%%rsp) , %[ret]"
+                : [ret] "={rdi}" (-> *InterruptFrame)
+            );
+            // Call the handler
+            func(frame);
+            // Restore registers
+            asm volatile (
+                \\ pop %%r11
+                \\ pop %%r10
+                \\ pop %%r9
+                \\ pop %%r8
+                \\ pop %%rsi
+                \\ pop %%rdi
+                \\ pop %%rdx
+                \\ pop %%rcx
+                \\ pop %%rax
+                :
+                :
+                : "rsp"
+            );
+            asm volatile ("iretq");
+        }
+    };
+}
+
+pub const IDTEntry = packed struct {
+    raw: packed struct {
+        offset_low: u16,
+        selector: u16,
+        ist: u8,
+        type_attr: u8,
+        offset_mid: u16,
+        offset_high: u32,
+        reserved__: u32,
+    },
+
+    const PRESENT = 1 << 15;
+    const RING_3 = 3 << 45;
+    const RING_0 = 0 << 45;
+
+    pub fn new(addr: u64, code_selector: SegmentSelector, ist: u3) IDTEntry {
+        return IDTEntry{
+            .raw = .{
+                .reserved__ = 0,
+                .offset_low = @intCast(u16, addr & 0xffff),
+                .offset_high = @intCast(u32, addr >> 32),
+                .offset_mid = @intCast(u16, (addr >> 16) & 0xffff),
+                .ist = 0,
+                .type_attr = 0b10001110,
+                .selector = code_selector.raw,
+            },
+        };
+    }
+};
+
+comptime {
+    assert(@sizeOf(IDTEntry) == 16);
+}
+
 pub const TSS = packed struct {
     _reserved1: u32,
     rsp: [3]u64,
