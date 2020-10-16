@@ -12,9 +12,13 @@ pub fn printk(comptime fmt: []const u8, args: var) void {
     com1.outStream().print(fmt, args) catch |err| {};
 }
 
-const GDT = x86.GlobalDescriptorTable(32);
+const GDT = x86.GlobalDescriptorTable(8);
+const IDT = x86.InterruptDescriptorTable;
+const TSS = x86.TSS;
+
 var main_gdt align(64) = GDT.new();
-var main_tss align(64) = std.mem.zeroes(x86.TSS);
+var main_tss align(64) = std.mem.zeroes(TSS);
+var main_idt align(64) = std.mem.zeroes(IDT);
 
 extern fn reload_cs(selector: u32) void;
 comptime {
@@ -29,7 +33,15 @@ comptime {
     );
 }
 
-fn init_gdt() void {
+var kernel_stack align(0x1000) = std.mem.zeroes([0x1000]u8);
+var user_stack align(0x1000) = std.mem.zeroes([0x1000]u8);
+
+fn hello_handler(frame: *x86.InterruptFrame) callconv(.C) void {
+    printk("Hello from interrupt\n", .{});
+    printk("RIP: {x}:{x}\n", .{ frame.cs, frame.rip });
+}
+
+fn init_cpu() void {
     const Entry = x86.GDTEntry;
 
     const null_entry = main_gdt.add_entry(Entry.nil);
@@ -52,7 +64,20 @@ fn init_gdt() void {
     reload_cs(kernel_code.raw);
 
     x86.ltr(tss_base.raw);
+
+    const isr = @ptrToInt(interrupt_entry);
+    printk("ISR: {x}\n", .{isr});
+
+    var i: u16 = 0;
+    while (i < main_idt.entries.len) : (i += 1) {
+        main_idt.set_entry(i, x86.IDTEntry.new(isr, kernel_code, 0));
+    }
+
+    main_idt.load();
+    @breakpoint();
 }
+
+const interrupt_entry = x86.InterruptHandler(hello_handler).handler;
 
 pub fn panic(msg: []const u8, return_trace: ?*builtin.StackTrace) noreturn {
     printk("{}\n", .{msg});
@@ -65,7 +90,6 @@ export fn kmain() void {
     printk("Booting the kernel...\n", .{});
     printk("CR3: 0x{x}\n", .{x86.CR3.read()});
     printk("CPU Vendor: {}\n", .{x86.get_vendor_string()});
-
-    init_gdt();
+    init_cpu();
     printk("Reloaded GDT\n", .{});
 }
