@@ -36,6 +36,7 @@ pub fn SerialPort(comptime id: u8) type {
         }
 
         pub inline fn write_char(self: Self, c: u8) void {
+            while (x86.in(u8, PORT_BASE + 5) & 0x20 == 0) {}
             x86.out(u8, PORT_BASE, c);
         }
 
