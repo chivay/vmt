@@ -175,7 +175,7 @@ pub const GDTEntry = packed struct {
 
     pub fn TaskState(tss: *TSS) [2]GDTEntry {
         var high: u64 = 0;
-        var ptr = @ptrToInt(tss);
+        var ptr = @ptrToInt(tss) - 0xffffffff00000000;
 
         var low: u64 = 0;
         low |= PRESENT;
@@ -185,8 +185,8 @@ pub const GDTEntry = packed struct {
         low |= (@sizeOf(TSS) - 1) & 0xffff;
 
         // set pointer
-        // 0..23 bits
-        low |= (ptr & 0x7fffff) << 16;
+        // 0..24 bits
+        low |= (ptr & 0xffffff) << 16;
 
         // high bits part
         high |= (ptr & 0xffffffff00000000) >> 32;
