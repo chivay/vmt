@@ -14,16 +14,12 @@ SECTIONS
     kernel_boot_end = .;
     . += 0xFFFFFFFF80000000;
 
-    .text : AT(kernel_boot_end) { *(.text) }
+    .text : AT(kernel_boot_end) ALIGN(0x1000) { *(.text) }
 
-    . = ALIGN(0x1000);
-    .data : AT((LOADADDR(.text) + SIZEOF(.text) + 0xFFF) & 0xFFFFFFFFFFFFF000) { *(.data) }
+    .data : AT((LOADADDR(.text) + SIZEOF(.text) + 0xFFF) & 0xFFFFFFFFFFFFF000) ALIGN(0x1000) { *(.data) }
 
-    . = ALIGN(0x1000);
-    .rodata : AT((LOADADDR(.data) + SIZEOF(.data) + 0xFFF) & 0xFFFFFFFFFFFFF000) { *(.rodata) }
+    .rodata : AT((LOADADDR(.data) + SIZEOF(.data) + 0xFFF) & 0xFFFFFFFFFFFFF000) ALIGN(0x1000) { *(.rodata) }
 
-    . = ALIGN(0x1000);
-    .bss : AT((LOADADDR(.rodata) + SIZEOF(.rodata) + 0xFFF) & 0xFFFFFFFFFFFFF000) { *(.bss) }
-    . = ALIGN(0x1000);
+    .bss : AT((LOADADDR(.rodata) + SIZEOF(.rodata) + 0xFFF) & 0xFFFFFFFFFFFFF000) ALIGN(0x1000) { *(.bss) }
     kernel_end = .;
 }
