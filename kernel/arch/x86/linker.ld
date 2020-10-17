@@ -9,7 +9,6 @@ SECTIONS
     .boot.text : { *(.boot.text) }
     .boot.data : { *(.boot.data) }
     .boot.bss : { *(.boot.bss) }
-    .boot.stack : { *(.boot.stack) }
     . = ALIGN(0x1000);
     kernel_boot_end = .;
     . += 0xFFFFFFFF80000000;

@@ -17,7 +17,7 @@
 .long FLAGS
 .long CHECKSUM
 
-.section .boot.data, "a"
+.section .boot.bss, "a", @nobits
 
 # 4-level paging structure
 .set ENTRY_SIZE,  8
@@ -112,7 +112,7 @@ multiboot_start:
     ljmp $GDT64_CODE_SEG, $START64_ADDR
 
 
-.section .boot.stack, "a"
+.section .boot.bss, "a", @nobits
 .align 16
     .lcomm stack_begin, STACK_SIZE
 .global stack
