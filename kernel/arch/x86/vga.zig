@@ -74,6 +74,7 @@ pub const VGAConsole = struct {
 
         if (self.cursor_x == VGADevice.VGA_WIDTH) {
             self.cursor_y += 1;
+            self.cursor_x = 0;
         }
         if (self.cursor_y == VGADevice.VGA_HEIGHT) {
             // TODO scroll
