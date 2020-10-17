@@ -20,5 +20,6 @@ SECTIONS
     .rodata : AT((LOADADDR(.data) + SIZEOF(.data) + 0xFFF) & 0xFFFFFFFFFFFFF000) ALIGN(0x1000) { *(.rodata) }
 
     .bss : AT((LOADADDR(.rodata) + SIZEOF(.rodata) + 0xFFF) & 0xFFFFFFFFFFFFF000) ALIGN(0x1000) { *(.bss) }
+    . = ALIGN(0x1000);
     kernel_end = .;
 }
