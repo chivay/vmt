@@ -163,7 +163,7 @@ export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *x86.Interrup
 }
 
 fn init_cpu() void {
-    const Entry = x86.GDTEntry;
+    const Entry = GDT.Entry;
 
     const null_entry = main_gdt.add_entry(Entry.nil);
     const kernel_code = main_gdt.add_entry(Entry.KernelCode);
@@ -189,7 +189,7 @@ fn init_cpu() void {
 
     for (exception_stubs) |ptr, i| {
         const addr: u64 = @ptrToInt(ptr);
-        main_idt.set_entry(@intCast(u16, i), x86.IDTEntry.new(addr, kernel_code, 0));
+        main_idt.set_entry(@intCast(u16, i), IDT.Entry.new(addr, kernel_code, 0));
     }
 
     main_idt.load();
