@@ -162,7 +162,7 @@ export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *x86.Interrup
     }
 }
 
-fn init_cpu() void {
+fn init_cpu() !void {
     const Entry = GDT.Entry;
 
     const null_entry = main_gdt.add_entry(Entry.nil);
@@ -193,7 +193,11 @@ fn init_cpu() void {
     }
 
     main_idt.load();
-    @breakpoint();
+
+    x86.pic.remap(0x30, 0x38);
+    // enable only keyboard interrupt
+    x86.pic.Master.data_write(0xfd);
+    x86.pic.Slave.data_write(0xff);
 }
 
 pub fn panic(msg: []const u8, return_trace: ?*builtin.StackTrace) noreturn {
@@ -201,24 +205,33 @@ pub fn panic(msg: []const u8, return_trace: ?*builtin.StackTrace) noreturn {
     x86.hang();
 }
 
+fn idle() void {
+    while (true) {
+        x86.hlt();
+    }
+}
+
 export fn kmain() void {
     vga_console = VGAConsole.init();
-
-    x86.pic.remap(0x30, 0x38);
 
     printk("Booting the kernel...\n", .{});
     printk("CR3: 0x{x}\n", .{x86.CR3.read()});
     printk("CPU Vendor: {}\n", .{x86.get_vendor_string()});
+    printk("Kernel end: {x}\n", .{x86.mm.get_kernel_end()});
 
-    init_cpu();
-    printk("CPU initialization finished\n", .{});
+    init_cpu() catch |err| {
+        @panic("Failed to initialize the CPU");
+    };
+    printk("CPU initialized\n", .{});
 
-    // enable only keyboard interrupt
-    x86.pic.Master.data_write(0xfd);
-    x86.pic.Slave.data_write(0xff);
+    var i: usize = 0;
+    while (i < 10) : (i += 1) {
+        const page = x86.mm.frameAllocator().alloc_frame() catch |err| {
+            @panic("Failed to allocate page frame");
+        };
+        printk("Allocated a frame {x}\n", .{page});
+    }
 
     x86.sti();
-    while (true) {
-        x86.hlt();
-    }
+    idle();
 }

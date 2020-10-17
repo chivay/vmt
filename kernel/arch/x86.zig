@@ -6,6 +6,7 @@ pub const vga = @import("x86/vga.zig");
 pub const serial = @import("x86/serial.zig");
 pub const pic = @import("x86/pic.zig");
 pub const keyboard = @import("x86/keyboard.zig");
+pub const mm = @import("x86/mm.zig");
 
 pub const InterruptDescriptorTable = packed struct {
     entries: [256]Entry,
