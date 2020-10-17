@@ -21,9 +21,14 @@ fn PIC(port_base: u32) type {
         pub fn set_mask(mask: u8) void {
             Self.data_write(mask);
         }
+
+        pub fn send_eoi() void {
+            Self.command(PIC_EOI);
+        }
     };
 }
 
+const PIC_EOI = 0x20;
 const ICW1_ICW4 = 1;
 const ICW4_8086 = 1;
 const ICW1_INIT = 0x10;
