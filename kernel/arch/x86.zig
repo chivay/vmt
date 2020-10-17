@@ -8,11 +8,44 @@ pub const pic = @import("x86/pic.zig");
 pub const keyboard = @import("x86/keyboard.zig");
 
 pub const InterruptDescriptorTable = packed struct {
-    entries: [256]IDTEntry,
+    entries: [256]Entry,
+
+    pub const Entry = packed struct {
+        raw: packed struct {
+            offset_low: u16,
+            selector: u16,
+            ist: u8,
+            type_attr: u8,
+            offset_mid: u16,
+            offset_high: u32,
+            reserved__: u32,
+        },
+        comptime {
+            assert(@sizeOf(@This()) == 16);
+        }
+
+        const PRESENT = 1 << 15;
+        const RING_3 = 3 << 45;
+        const RING_0 = 0 << 45;
+
+        pub fn new(addr: u64, code_selector: SegmentSelector, ist: u3) Entry {
+            return .{
+                .raw = .{
+                    .reserved__ = 0,
+                    .offset_low = @intCast(u16, addr & 0xffff),
+                    .offset_high = @intCast(u32, addr >> 32),
+                    .offset_mid = @intCast(u16, (addr >> 16) & 0xffff),
+                    .ist = 0,
+                    .type_attr = 0b10001110,
+                    .selector = code_selector.raw,
+                },
+            };
+        }
+    };
 
     const Self = @This();
 
-    pub fn set_entry(self: *Self, which: u16, entry: IDTEntry) void {
+    pub fn set_entry(self: *Self, which: u16, entry: Entry) void {
         self.entries[which] = entry;
     }
 
@@ -35,45 +68,11 @@ pub const InterruptFrame = packed struct {
     flags: u64,
     rsp: u64,
     ss: u64,
-};
 
-comptime {
-    assert(@sizeOf(InterruptFrame) == 40);
-}
-
-pub const IDTEntry = packed struct {
-    raw: packed struct {
-        offset_low: u16,
-        selector: u16,
-        ist: u8,
-        type_attr: u8,
-        offset_mid: u16,
-        offset_high: u32,
-        reserved__: u32,
-    },
-
-    const PRESENT = 1 << 15;
-    const RING_3 = 3 << 45;
-    const RING_0 = 0 << 45;
-
-    pub fn new(addr: u64, code_selector: SegmentSelector, ist: u3) IDTEntry {
-        return IDTEntry{
-            .raw = .{
-                .reserved__ = 0,
-                .offset_low = @intCast(u16, addr & 0xffff),
-                .offset_high = @intCast(u32, addr >> 32),
-                .offset_mid = @intCast(u16, (addr >> 16) & 0xffff),
-                .ist = 0,
-                .type_attr = 0b10001110,
-                .selector = code_selector.raw,
-            },
-        };
+    comptime {
+        assert(@sizeOf(InterruptFrame) == 40);
     }
 };
-
-comptime {
-    assert(@sizeOf(IDTEntry) == 16);
-}
 
 pub const TSS = packed struct {
     _reserved1: u32,
@@ -110,64 +109,64 @@ pub const SegmentSelector = struct {
     }
 };
 
-pub const GDTEntry = packed struct {
-    raw: u64,
-
-    const WRITABLE = 1 << 41;
-    const CONFORMING = 1 << 42;
-    const EXECUTABLE = 1 << 43;
-    const USER = 1 << 44;
-    const RING_3 = 3 << 45;
-    const PRESENT = 1 << 47;
-    const LONG_MODE = 1 << 53;
-    const DEFAULT_SIZE = 1 << 54;
-    const GRANULARITY = 1 << 55;
-
-    const LIMIT_LO = 0xffff;
-    const LIMIT_HI = 0xf << 48;
-
-    const ORDINARY = USER | PRESENT | WRITABLE | LIMIT_LO | LIMIT_HI | GRANULARITY;
-
-    pub const nil = GDTEntry{ .raw = 0 };
-    pub const KernelData = GDTEntry{ .raw = ORDINARY | DEFAULT_SIZE };
-    pub const KernelCode = GDTEntry{ .raw = ORDINARY | EXECUTABLE | LONG_MODE };
-    pub const UserCode = GDTEntry{ .raw = KernelCode.raw | RING_3 };
-    pub const UserData = GDTEntry{ .raw = KernelData.raw | RING_3 };
-
-    pub fn TaskState(tss: *TSS) [2]GDTEntry {
-        var high: u64 = 0;
-        var ptr = @ptrToInt(tss) - 0xffffffff00000000;
-
-        var low: u64 = 0;
-        low |= PRESENT;
-        // 64 bit available TSS;
-        low |= 0b1001 << 40;
-        // set limit
-        low |= (@sizeOf(TSS) - 1) & 0xffff;
-
-        // set pointer
-        // 0..24 bits
-        low |= (ptr & 0xffffff) << 16;
-
-        // high bits part
-        high |= (ptr & 0xffffffff00000000) >> 32;
-        return [2]GDTEntry{ GDTEntry{ .raw = low }, GDTEntry{ .raw = high } };
-    }
-};
-
 pub fn GlobalDescriptorTable(n: u16) type {
     return packed struct {
-        entries: [n]GDTEntry align(0x10),
+        entries: [n]Entry align(0x10),
         free_slot: u16,
+
+        pub const Entry = packed struct {
+            raw: u64,
+
+            const WRITABLE = 1 << 41;
+            const CONFORMING = 1 << 42;
+            const EXECUTABLE = 1 << 43;
+            const USER = 1 << 44;
+            const RING_3 = 3 << 45;
+            const PRESENT = 1 << 47;
+            const LONG_MODE = 1 << 53;
+            const DEFAULT_SIZE = 1 << 54;
+            const GRANULARITY = 1 << 55;
+
+            const LIMIT_LO = 0xffff;
+            const LIMIT_HI = 0xf << 48;
+
+            const ORDINARY = USER | PRESENT | WRITABLE | LIMIT_LO | LIMIT_HI | GRANULARITY;
+
+            pub const nil = Entry{ .raw = 0 };
+            pub const KernelData = Entry{ .raw = ORDINARY | DEFAULT_SIZE };
+            pub const KernelCode = Entry{ .raw = ORDINARY | EXECUTABLE | LONG_MODE };
+            pub const UserCode = Entry{ .raw = KernelCode.raw | RING_3 };
+            pub const UserData = Entry{ .raw = KernelData.raw | RING_3 };
+
+            pub fn TaskState(tss: *TSS) [2]Entry {
+                var high: u64 = 0;
+                var ptr = @ptrToInt(tss) - 0xffffffff00000000;
+
+                var low: u64 = 0;
+                low |= PRESENT;
+                // 64 bit available TSS;
+                low |= 0b1001 << 40;
+                // set limit
+                low |= (@sizeOf(TSS) - 1) & 0xffff;
+
+                // set pointer
+                // 0..24 bits
+                low |= (ptr & 0xffffff) << 16;
+
+                // high bits part
+                high |= (ptr & 0xffffffff00000000) >> 32;
+                return [2]Entry{ .{ .raw = low }, .{ .raw = high } };
+            }
+        };
 
         const Self = @This();
 
         pub fn new() Self {
-            var gdt = Self{ .entries = std.mem.zeroes([n]GDTEntry), .free_slot = 0 };
+            var gdt = Self{ .entries = std.mem.zeroes([n]Entry), .free_slot = 0 };
             return gdt;
         }
 
-        pub fn add_entry(self: *Self, entry: GDTEntry) SegmentSelector {
+        pub fn add_entry(self: *Self, entry: Entry) SegmentSelector {
             assert(self.free_slot < n);
             self.entries[self.free_slot] = entry;
             self.free_slot += 1;
