@@ -159,6 +159,7 @@ pub const Scancode = enum(u8) {
             .ZPressed => 'z',
 
             .SpacePressed => ' ',
+            .EnterPressed => '\n',
 
             else => null,
         };
