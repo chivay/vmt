@@ -6,7 +6,22 @@ pub const VGADevice = struct {
     const VGA_HEIGHT = 25;
 
     const Color = packed enum(u4) {
-        Black = 0, Blue = 1, Green = 2, Cyan = 3, Red = 4, Purple = 5, Brown = 6, Gray = 7, DarkGray = 8, LightBlue = 9, LightGreen = 10, LightCyan = 11, LightRed = 12, LightPurple = 13, Yellow = 14, White = 15
+        Black = 0,
+        Blue = 1,
+        Green = 2,
+        Cyan = 3,
+        Red = 4,
+        Purple = 5,
+        Brown = 6,
+        Gray = 7,
+        DarkGray = 8,
+        LightBlue = 9,
+        LightGreen = 10,
+        LightCyan = 11,
+        LightRed = 12,
+        LightPurple = 13,
+        Yellow = 14,
+        White = 15,
     };
 
     pub fn make_color(back: Color, front: Color) u8 {
