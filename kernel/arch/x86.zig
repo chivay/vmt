@@ -5,6 +5,7 @@ usingnamespace @import("x86/asm.zig");
 pub const vga = @import("x86/vga.zig");
 pub const serial = @import("x86/serial.zig");
 pub const pic = @import("x86/pic.zig");
+pub const keyboard = @import("x86/keyboard.zig");
 
 pub const InterruptDescriptorTable = packed struct {
     entries: [256]IDTEntry,
@@ -38,54 +39,6 @@ pub const InterruptFrame = packed struct {
 
 comptime {
     assert(@sizeOf(InterruptFrame) == 40);
-}
-
-pub const IntHandler = fn (*InterruptFrame) callconv(.C) void;
-pub const IntHandlerError = fn (*InterruptFrame) callconv(.C) void;
-
-pub fn InterruptHandler(func: IntHandler) type {
-    return struct {
-        pub fn handler() callconv(.Naked) void {
-            // Save registers
-            asm volatile (
-                \\ push %%rax
-                \\ push %%rcx
-                \\ push %%rdx
-                \\ push %%rdi
-                \\ push %%rsi
-                \\ push %%r8
-                \\ push %%r9
-                \\ push %%r10
-                \\ push %%r11
-                :
-                :
-                : "rsp"
-            );
-            // RSP is pointing to the beginning of the
-            // interrupt frame
-            var frame = asm volatile ("lea 72(%%rsp) , %[ret]"
-                : [ret] "={rdi}" (-> *InterruptFrame)
-            );
-            // Call the handler
-            func(frame);
-            // Restore registers
-            asm volatile (
-                \\ pop %%r11
-                \\ pop %%r10
-                \\ pop %%r9
-                \\ pop %%r8
-                \\ pop %%rsi
-                \\ pop %%rdi
-                \\ pop %%rdx
-                \\ pop %%rcx
-                \\ pop %%rax
-                :
-                :
-                : "rsp"
-            );
-            asm volatile ("iretq");
-        }
-    };
 }
 
 pub const IDTEntry = packed struct {

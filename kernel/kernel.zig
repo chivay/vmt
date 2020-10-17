@@ -23,10 +23,143 @@ var main_idt align(64) = std.mem.zeroes(IDT);
 var kernel_stack align(0x1000) = std.mem.zeroes([0x1000]u8);
 var user_stack align(0x1000) = std.mem.zeroes([0x1000]u8);
 
-fn hello_handler(frame: *x86.InterruptFrame) callconv(.C) void {
-    printk("Hello from interrupt\n", .{});
-    printk("RIP: {x}:{x}\n", .{ frame.cs, frame.rip });
-    @panic("Nothing to do!");
+const InterruptStub = fn () callconv(.Naked) void;
+
+fn has_error_code(vector: u16) bool {
+    return switch (vector) {
+        // Double Fault
+        0x8 => true,
+        // Invalid TSS
+        // Segment not present
+        // SS fault
+        // GP fault
+        // Page fault
+        0xa...0xe => true,
+
+        // Alignment check
+        0x11 => true,
+
+        // Security exception
+        0x1e => true,
+        else => false,
+    };
+}
+
+pub const IntHandler = fn (u8, u64, *InterruptFrame) callconv(.C) void;
+
+/// Generate stub for n-th exception
+fn exception_stub(comptime n: u8) InterruptStub {
+    // Have to bump this, otherwise compilation fails
+    @setEvalBranchQuota(2000);
+    comptime var buffer = std.mem.zeroes([3]u8);
+    comptime var l = std.fmt.formatIntBuf(buffer[0..], n, 10, false, std.fmt.FormatOptions{});
+
+    // Can I return function directly?
+    return struct {
+        pub fn f() callconv(.Naked) noreturn {
+            // Clear direction flag
+            asm volatile ("cld");
+
+            // Push fake error code
+            if (comptime !has_error_code(n)) {
+                asm volatile ("push $0");
+            }
+
+            // Push interrupt number
+            asm volatile ("push $" ++ buffer);
+
+            // Call common interrupt entry
+            asm volatile ("call common_entry");
+
+            // Pop interrupt number and maybe error code
+            asm volatile ("add $0x10, %%rsp");
+
+            // Return from interrupt
+            asm volatile ("iretq");
+            unreachable;
+        }
+    }.f;
+}
+
+export fn common_entry() callconv(.Naked) void {
+    asm volatile (
+        \\ push %%rax
+        \\ push %%rcx
+        \\ push %%rdx
+        \\ push %%rdi
+        \\ push %%rsi
+        \\ push %%r8
+        \\ push %%r9
+        \\ push %%r10
+        \\ push %%r11
+    );
+    // Stack layout:
+    // [interrupt frame]
+    // [error code]
+    // [interrupt number]
+    // [return address to stub]
+    // [saved rax]
+    // [saved rcx]
+    // [saved rdx]
+    // [saved rdi]
+    // [saved rsi]
+    // [saved  r8]
+    // [saved  r9]
+    // [saved r10]
+    // [saved r11] <- rsp
+    asm volatile (
+        \\ xor %%edi, %%edi
+        \\ movb 80(%%rsp), %%dil # load u8 interrupt number
+        \\ movl 88(%%rsp), %%esi # load error code
+        \\ lea 96(%%rsp), %%rdx
+        \\ call hello_handler
+    );
+    asm volatile (
+        \\ pop %%r11
+        \\ pop %%r10
+        \\ pop %%r9
+        \\ pop %%r8
+        \\ pop %%rsi
+        \\ pop %%rdi
+        \\ pop %%rdx
+        \\ pop %%rcx
+        \\ pop %%rax
+    );
+}
+
+var exception_stubs = init: {
+    @setEvalBranchQuota(100000);
+    var stubs: [256]InterruptStub = undefined;
+
+    for (stubs) |*pt, i| {
+        pt.* = exception_stub(i);
+    }
+
+    break :init stubs;
+};
+
+fn keyboard_echo() void {
+    const scancode = @intToEnum(x86.keyboard.Scancode, x86.in(u8, 0x60));
+    if (scancode.to_ascii()) |c| {
+        printk("{c}", .{c});
+    }
+    x86.pic.Master.send_eoi();
+}
+
+export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *x86.InterruptFrame) callconv(.C) void {
+    switch (interrupt_num) {
+        // Breakpoint
+        0x3 => {
+            printk("BREAKPOINT\n", .{});
+            printk("======================\n", .{});
+            printk("{}\n", .{frame});
+            printk("======================\n", .{});
+        },
+        0x31 => {
+            keyboard_echo();
+        },
+        else => printk("Received unknown interrupt {}\n", .{interrupt_num}),
+    }
 }
 
 fn init_cpu() void {
@@ -54,19 +187,14 @@ fn init_cpu() void {
 
     x86.ltr(tss_base.raw);
 
-    const isr = @ptrToInt(interrupt_entry);
-    printk("ISR: {x}\n", .{isr});
-
-    var i: u16 = 0;
-    while (i < main_idt.entries.len) : (i += 1) {
-        main_idt.set_entry(i, x86.IDTEntry.new(isr, kernel_code, 0));
+    for (exception_stubs) |ptr, i| {
+        const addr: u64 = @ptrToInt(ptr);
+        main_idt.set_entry(@intCast(u16, i), x86.IDTEntry.new(addr, kernel_code, 0));
     }
 
     main_idt.load();
     @breakpoint();
 }
-
-const interrupt_entry = x86.InterruptHandler(hello_handler).handler;
 
 pub fn panic(msg: []const u8, return_trace: ?*builtin.StackTrace) noreturn {
     printk("PANIK: {}\n", .{msg});
@@ -76,9 +204,21 @@ pub fn panic(msg: []const u8, return_trace: ?*builtin.StackTrace) noreturn {
 export fn kmain() void {
     vga_console = VGAConsole.init();
 
+    x86.pic.remap(0x30, 0x38);
+
     printk("Booting the kernel...\n", .{});
     printk("CR3: 0x{x}\n", .{x86.CR3.read()});
     printk("CPU Vendor: {}\n", .{x86.get_vendor_string()});
 
     init_cpu();
+    printk("CPU initialization finished\n", .{});
+
+    // enable only keyboard interrupt
+    x86.pic.Master.data_write(0xfd);
+    x86.pic.Slave.data_write(0xff);
+
+    x86.sti();
+    while (true) {
+        x86.hlt();
+    }
 }
