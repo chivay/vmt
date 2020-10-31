@@ -221,7 +221,7 @@ fn idle() void {
 
 export fn multiboot_entry(mb_info: u32) callconv(.C) void {
     // Initialize multiboot info pointer
-    const mb_info_virt = x86.mm.IdentityMapping.phys_to_virt(mb_info);
+    const mb_info_virt = x86.mm.EarlyMapping.phys_to_virt(mb_info);
     const info = @intToPtr(*x86.multiboot.Info, mb_info_virt);
     x86.multiboot.info_pointer = info;
 
@@ -229,11 +229,24 @@ export fn multiboot_entry(mb_info: u32) callconv(.C) void {
 }
 
 fn init_memory() void {
-    const free_memory = x86.mm.detect_memory();
-    if (free_memory == null) {
+    const mem = x86.mm.detect_memory();
+    if (mem == null) {
         @panic("Unable to find any free memory!");
     }
-    printk("Detected {}MiB of free memory\n", .{free_memory.?.size / 1024 / 1024});
+    var free_memory = mem.?;
+
+    // Ensure we don't overwrite kernel
+    const kernel_end = x86.mm.EarlyMapping.virt_to_phys(x86.mm.get_kernel_end());
+    // Move beginning to after kernel
+    const begin = std.math.max(kernel_end, free_memory.base);
+    const adjusted_memory = x86.mm.MemoryRange.from_range(begin, free_memory.get_end());
+
+    printk("Detected {}MiB of free memory\n", .{adjusted_memory.size / 1024 / 1024});
+
+    x86.mm.init(adjusted_memory);
+
+    const addr = x86.mm.frameAllocator().alloc_frame();
+    printk("{x}\n", .{addr});
 }
 
 fn kmain() void {
