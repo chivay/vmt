@@ -3,6 +3,15 @@ const io = std.io;
 const os = std.os;
 const x86 = @import("../x86.zig");
 
+var vga_console: ?VGAConsole = null;
+
+pub fn getConsole() *VGAConsole {
+    if (vga_console == null) {
+        vga_console = VGAConsole.init();
+    }
+    return &vga_console.?;
+}
+
 pub const VGADevice = struct {
     const VGA_WIDTH = 80;
     const VGA_HEIGHT = 25;
