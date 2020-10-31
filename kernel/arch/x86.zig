@@ -8,6 +8,7 @@ pub const pic = @import("x86/pic.zig");
 pub const keyboard = @import("x86/keyboard.zig");
 pub const mm = @import("x86/mm.zig");
 pub const multiboot = @import("x86/multiboot.zig");
+pub const acpi = @import("x86/acpi.zig");
 
 pub const InterruptDescriptorTable = packed struct {
     entries: [256]Entry,
@@ -25,10 +26,6 @@ pub const InterruptDescriptorTable = packed struct {
         comptime {
             assert(@sizeOf(@This()) == 16);
         }
-
-        const PRESENT = 1 << 15;
-        const RING_3 = 3 << 45;
-        const RING_0 = 0 << 45;
 
         pub fn new(addr: u64, code_selector: SegmentSelector, ist: u3) Entry {
             return .{

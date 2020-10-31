@@ -1,4 +1,7 @@
 const std = @import("std");
+const kernel = @import("root");
+
+const printk = kernel.printk;
 
 const x86 = @import("../x86.zig");
 
@@ -100,4 +103,70 @@ var main_allocator: FrameAllocator = std.mem.zeroes(FrameAllocator);
 
 pub fn frameAllocator() *FrameAllocator {
     return main_allocator.init();
+}
+
+pub const MemoryRange = struct {
+    base: u64,
+    size: u64,
+};
+
+pub fn detect_memory() ?MemoryRange {
+    if (x86.multiboot.info_pointer) |mbinfo| {
+        return detect_multiboot_memory(mbinfo);
+    }
+
+    return null;
+}
+
+fn bit_set(value: var, comptime bit: usize) bool {
+    return ((value >> bit) & 1) != 0;
+}
+
+fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?MemoryRange {
+    if (!bit_set(mb_info.flags, 6)) {
+        @panic("Missing memory map!");
+    }
+
+    const MemEntry = packed struct {
+        // at -4 offset
+        size: u32,
+        // at 0 offset
+        base_addr: u64,
+        length: u64,
+        type_: u32,
+    };
+
+    var best_slot: ?MemoryRange = null;
+
+    var offset = mb_info.mmap_addr;
+    const mmap_end = mb_info.mmap_addr + mb_info.mmap_length;
+
+    printk("BIOS memory map:\n", .{});
+    while (offset < mmap_end) {
+        const entry = @intToPtr(*MemEntry, x86.mm.IdentityMapping.phys_to_virt(offset));
+
+        const start = entry.base_addr;
+        const end = start + entry.length - 1;
+        const status = switch (entry.type_) {
+            1 => "Available",
+            3 => "ACPI Mem",
+            4 => "Preserved on hibernation",
+            5 => "Defective",
+            else => "Reserved",
+        };
+        printk("[{x:0>10}-{x:0>10}] {}\n", .{ start, end, status });
+        offset += entry.size + @sizeOf(@TypeOf(entry.size));
+
+        const this_slot = MemoryRange{ .base = entry.base_addr, .size = entry.length };
+
+        if (best_slot) |slot| {
+            if (this_slot.size > slot.size) {
+                best_slot = this_slot;
+            }
+        } else {
+            best_slot = this_slot;
+        }
+    }
+
+    return best_slot;
 }

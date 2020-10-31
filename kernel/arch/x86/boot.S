@@ -1,6 +1,6 @@
 
 # Misc constants
-.set STACK_SIZE, 0x10000
+.set STACK_SIZE, 0x20000
 .set IA32_EFER, 0xC0000080
 
 # Multiboot constants
@@ -26,10 +26,10 @@
 
 .set ENTRY_PRESENT,  (1 << 0)
 .set ENTRY_WRITABLE, (1 << 1)
-.set ENTRY_1GB,      (1 << 7)
+.set ENTRY_LARGE,      (1 << 7)
 
-.set PAGE_4K,  (ENTRY_PRESENT | ENTRY_WRITABLE)
-.set PAGE_1G, (ENTRY_PRESENT | ENTRY_WRITABLE | ENTRY_1GB)
+.set NORMAL_ENTRY,  (ENTRY_PRESENT | ENTRY_WRITABLE)
+.set LARGE_ENTRY, (ENTRY_PRESENT | ENTRY_WRITABLE | ENTRY_LARGE)
 
 
 .align 0x1000
@@ -56,13 +56,21 @@ initialize_page_tables:
     movl $pml4t, %eax
     movl %eax, %cr3
 
-    # Map first 2 MiB
-    movl $pdpt + 0b11, pml4t
-    movl $pdpt_high + 0b11, pml4t + 511 * 8
+    movl $pdpt + (NORMAL_ENTRY), pml4t
+    movl $pdpt_high + (NORMAL_ENTRY), pml4t + 511 * 8
 
-    movl $pdt + 0b11, pdpt
-    movl $pdt + 0b11, pdpt_high + 510 * 8
-    movl $0b10000011, pdt
+    movl $pdt + (NORMAL_ENTRY), pdpt
+    movl $pdt + (NORMAL_ENTRY), pdpt_high + 510 * 8
+
+    # Map first 16 MiB in low and high memory
+    movl $0x000000 + (LARGE_ENTRY), pdt + 0 * 8
+    movl $0x200000 + (LARGE_ENTRY), pdt + 1 * 8
+    movl $0x400000 + (LARGE_ENTRY), pdt + 2 * 8
+    movl $0x600000 + (LARGE_ENTRY), pdt + 3 * 8
+    movl $0x800000 + (LARGE_ENTRY), pdt + 4 * 8
+    movl $0xa00000 + (LARGE_ENTRY), pdt + 5 * 8
+    movl $0xc00000 + (LARGE_ENTRY), pdt + 6 * 8
+    movl $0xe00000 + (LARGE_ENTRY), pdt + 7 * 8
 
     ret
 
@@ -177,7 +185,8 @@ start64:
     #mov $500, %ecx
     #rep stosq
 
-    call kmain
+    mov %ebx, %edi
+    call multiboot_entry
 
     cli
     hlt

@@ -1,3 +1,5 @@
+pub var info_pointer: ?*Info = null;
+
 pub const AoutSymbolTable = packed struct {
     tabsize: u32,
     strsize: u32,

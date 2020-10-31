@@ -29,9 +29,6 @@ var main_gdt align(64) = GDT.new();
 var main_tss align(64) = std.mem.zeroes(TSS);
 var main_idt align(64) = std.mem.zeroes(IDT);
 
-var kernel_stack align(0x1000) = std.mem.zeroes([0x1000]u8);
-var user_stack align(0x1000) = std.mem.zeroes([0x1000]u8);
-
 const InterruptStub = fn () callconv(.Naked) void;
 
 fn has_error_code(vector: u16) bool {
@@ -150,7 +147,9 @@ var exception_stubs = init: {
 fn keyboard_echo() void {
     const scancode = @intToEnum(x86.keyboard.Scancode, x86.in(u8, 0x60));
     if (scancode.to_ascii()) |c| {
-        printk("{c}", .{c});
+        switch (c) {
+            else => {},
+        }
     }
     x86.pic.Master.send_eoi();
 }
@@ -181,8 +180,8 @@ fn init_cpu() !void {
     const user_data = main_gdt.add_entry(Entry.UserData);
 
     // Kinda ugly, refactor this
-    const tss_base = main_gdt.add_entry(Entry.TaskState(&main_tss)[0]);
-    _ = main_gdt.add_entry(Entry.TaskState(&main_tss)[1]);
+    //const tss_base = main_gdt.add_entry(Entry.TaskState(&main_tss)[0]);
+    //_ = main_gdt.add_entry(Entry.TaskState(&main_tss)[1]);
 
     main_gdt.load();
 
@@ -194,7 +193,7 @@ fn init_cpu() !void {
 
     main_gdt.reload_cs(kernel_code);
 
-    x86.ltr(tss_base.raw);
+    //x86.ltr(tss_base.raw);
 
     for (exception_stubs) |ptr, i| {
         const addr: u64 = @ptrToInt(ptr);
@@ -220,9 +219,24 @@ fn idle() void {
     }
 }
 
-export fn kmain() void {
-    vga_console = VGAConsole.init();
+export fn multiboot_entry(mb_info: u32) callconv(.C) void {
+    // Initialize multiboot info pointer
+    const mb_info_virt = x86.mm.IdentityMapping.phys_to_virt(mb_info);
+    const info = @intToPtr(*x86.multiboot.Info, mb_info_virt);
+    x86.multiboot.info_pointer = info;
 
+    kmain();
+}
+
+fn init_memory() void {
+    const free_memory = x86.mm.detect_memory();
+    if (free_memory == null) {
+        @panic("Unable to find any free memory!");
+    }
+    printk("Detected {}MiB of free memory\n", .{free_memory.?.size / 1024 / 1024});
+}
+
+fn kmain() void {
     printk("Booting the kernel...\n", .{});
     printk("CR3: 0x{x}\n", .{x86.CR3.read()});
     printk("CPU Vendor: {}\n", .{x86.get_vendor_string()});
@@ -233,14 +247,11 @@ export fn kmain() void {
     };
     printk("CPU initialized\n", .{});
 
-    var i: usize = 0;
-    while (i < 10) : (i += 1) {
-        const page = x86.mm.frameAllocator().alloc_frame() catch |err| {
-            @panic("Failed to allocate page frame");
-        };
-        printk("Allocated a frame {x}\n", .{page});
-    }
+    init_memory();
 
+    x86.acpi.init();
+
+    printk("Idling...\n", .{});
     x86.sti();
     idle();
 }
