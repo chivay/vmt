@@ -52,7 +52,7 @@ pub fn build(b: *Builder) void {
 
     kernel.setBuildMode(mode);
     kernel.code_model = builtin.CodeModel.kernel;
-    kernel.strip = true;
+    kernel.strip = false;
 
     const arch = Arch.x86_64;
     buildArch(kernel, arch);
