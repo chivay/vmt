@@ -1,15 +1,24 @@
 const x86 = @import("arch.zig").x86;
 const std = @import("std");
 const builtin = @import("builtin");
-const VGAConsole = x86.vga.VGAConsole;
 
-var vga_console: ?VGAConsole = null;
+fn format_to_vga(comptime fmt: []const u8, args: var) void {
+    x86.vga.getConsole().outStream().print(fmt, args) catch |err| {};
+}
+
+fn format_to_com1(comptime fmt: []const u8, args: var) void {
+    x86.serial.SerialPort(1).outStream().print(fmt, args) catch |err| {};
+}
 
 pub fn printk(comptime fmt: []const u8, args: var) void {
-    var vgacon: *VGAConsole = &vga_console.?;
-    const com1 = x86.serial.SerialPort(1);
-    vgacon.outStream().print(fmt, args) catch |err| {};
-    com1.outStream().print(fmt, args) catch |err| {};
+    comptime var sinks = [_](fn ([]const u8, var) void){
+        format_to_vga,
+        format_to_com1,
+    };
+
+    inline for (sinks) |sink| {
+        sink(fmt, args);
+    }
 }
 
 const GDT = x86.GlobalDescriptorTable(8);
