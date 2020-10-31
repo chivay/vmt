@@ -27,9 +27,10 @@ pub fn get_kernel_end() u64 {
     return @ptrToInt(&kernel_end);
 }
 
-pub const IdentityMapping = struct {
+pub const EarlyMapping = struct {
+    /// Simple mapping from boot time
     pub const VIRT_START = 0xffffffff80000000;
-    pub const SIZE = GiB(10);
+    pub const SIZE = MiB(16);
     pub const VIRT_END = VIRT_START + SIZE;
 
     pub fn virt_to_phys(addr: u64) u64 {
@@ -44,7 +45,6 @@ pub const IdentityMapping = struct {
 };
 
 pub const FrameAllocator = struct {
-    initialized: bool,
     // next physical address to allocate
     next_free: u64,
     limit: u64,
@@ -56,23 +56,19 @@ pub const FrameAllocator = struct {
 
     const OutOfMemory = error.OutOfMemory;
 
-    pub fn init(self: *Self) *FrameAllocator {
-        if (self.initialized) {
-            return self;
-        }
-
-        self.next_free = IdentityMapping.virt_to_phys(get_kernel_end());
-        self.limit = self.next_free + GiB(1);
-        self.initialized = true;
-
-        return self;
+    pub fn new(memory: MemoryRange) FrameAllocator {
+        return .{
+            .next_free = std.mem.alignForward(memory.base, PAGE_SIZE),
+            .limit = memory.size,
+            .freelist = std.SinglyLinkedList(void).init(),
+        };
     }
 
     pub fn alloc_frame(self: *Self) !u64 {
         // Try allocating from freelist
         if (self.freelist.popFirst()) |node| {
             const virt_addr = @ptrToInt(node);
-            const phys_addr = IdentityMapping.virt_to_phys(virt_addr);
+            const phys_addr = EarlyMapping.virt_to_phys(virt_addr);
             return phys_addr;
         }
         // No free pages in list
@@ -99,15 +95,29 @@ pub const FrameAllocator = struct {
     }
 };
 
-var main_allocator: FrameAllocator = std.mem.zeroes(FrameAllocator);
+var main_allocator: FrameAllocator = undefined;
 
 pub fn frameAllocator() *FrameAllocator {
-    return main_allocator.init();
+    return &main_allocator;
+}
+
+pub fn init(phys_mem: MemoryRange) void {
+    main_allocator = FrameAllocator.new(phys_mem);
 }
 
 pub const MemoryRange = struct {
     base: u64,
     size: u64,
+
+    pub fn get_end(self: @This()) u64 {
+        return self.base + self.size;
+    }
+
+    pub fn from_range(start: u64, end: u64) MemoryRange {
+        std.debug.assert(start < end);
+        const size = end - start;
+        return .{ .base = start, .size = size };
+    }
 };
 
 pub fn detect_memory() ?MemoryRange {
@@ -143,7 +153,7 @@ fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?MemoryRange {
 
     printk("BIOS memory map:\n", .{});
     while (offset < mmap_end) {
-        const entry = @intToPtr(*MemEntry, x86.mm.IdentityMapping.phys_to_virt(offset));
+        const entry = @intToPtr(*MemEntry, x86.mm.EarlyMapping.phys_to_virt(offset));
 
         const start = entry.base_addr;
         const end = start + entry.length - 1;
