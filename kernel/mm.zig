@@ -49,6 +49,13 @@ pub const VirtualAddress = struct {
     pub fn lt(self: @This(), other: VirtualAddress) bool {
         return self.value < other.value;
     }
+
+    pub fn format(self: @This(), fmt: []const u8, options: std.fmt.FormatOptions, stream: var) !void {
+        try stream.writeAll(@typeName(@This()));
+        try stream.writeAll("{");
+        try std.fmt.formatInt(self.value, 16, false, options, stream);
+        try stream.writeAll("}");
+    }
 };
 
 pub const PhysicalAddress = struct {
@@ -93,6 +100,13 @@ pub const PhysicalAddress = struct {
 
     pub fn le(self: @This(), other: PhysicalAddress) bool {
         return self.value <= other.value;
+    }
+
+    pub fn format(self: @This(), fmt: []const u8, options: std.fmt.FormatOptions, stream: var) !void {
+        try stream.writeAll(@typeName(@This()));
+        try stream.writeAll("{");
+        try std.fmt.formatInt(self.value, 16, false, options, stream);
+        try stream.writeAll("}");
     }
 };
 
