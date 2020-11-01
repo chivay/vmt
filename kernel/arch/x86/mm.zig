@@ -1,126 +1,33 @@
 const std = @import("std");
 const kernel = @import("root");
-
 const printk = kernel.printk;
-
+const mm = kernel.mm;
 const x86 = @import("../x86.zig");
 
-pub fn KiB(comptime bytes: u64) u64 {
-    return bytes * 1024;
-}
-
-pub fn MiB(comptime bytes: u64) u64 {
-    return KiB(bytes) * 1024;
-}
-
-pub fn GiB(comptime bytes: u64) u64 {
-    return KiB(bytes) * 1024;
-}
-
-pub fn TiB(comptime bytes: u64) u64 {
-    return KiB(bytes) * 1024;
-}
+pub const VirtAddrType = u64;
+pub const PhysAddrType = u64;
 
 pub extern var kernel_end: [*]u8;
 
-pub fn get_kernel_end() u64 {
-    return @ptrToInt(&kernel_end);
+pub fn get_kernel_end() mm.VirtualAddress {
+    return mm.VirtualAddress.new(@ptrToInt(&kernel_end));
 }
 
-pub const EarlyMapping = struct {
-    /// Simple mapping from boot time
-    pub const VIRT_START = 0xffffffff80000000;
-    pub const SIZE = MiB(16);
-    pub const VIRT_END = VIRT_START + SIZE;
+var identity_mapping: mm.IdentityMapping = undefined;
 
-    pub fn virt_to_phys(addr: u64) u64 {
-        std.debug.assert(addr >= VIRT_START and addr < VIRT_END);
-        return addr - VIRT_START;
-    }
+pub fn identityMapping() *mm.IdentityMapping {
+    return &identity_mapping;
+}
 
-    pub fn phys_to_virt(addr: u64) u64 {
-        std.debug.assert(addr < SIZE);
-        return addr + VIRT_START;
-    }
-};
+var kernel_vm: mm.VirtualMemory = undefined;
 
-pub const FrameAllocator = struct {
-    // next physical address to allocate
-    next_free: u64,
-    limit: u64,
-    freelist: std.SinglyLinkedList(void),
+var main_allocator: mm.FrameAllocator = undefined;
 
-    const PAGE_SIZE = 0x1000;
-
-    const Self = @This();
-
-    const OutOfMemory = error.OutOfMemory;
-
-    pub fn new(memory: MemoryRange) FrameAllocator {
-        return .{
-            .next_free = std.mem.alignForward(memory.base, PAGE_SIZE),
-            .limit = memory.size,
-            .freelist = std.SinglyLinkedList(void).init(),
-        };
-    }
-
-    pub fn alloc_frame(self: *Self) !u64 {
-        // Try allocating from freelist
-        if (self.freelist.popFirst()) |node| {
-            const virt_addr = @ptrToInt(node);
-            const phys_addr = EarlyMapping.virt_to_phys(virt_addr);
-            return phys_addr;
-        }
-        // No free pages in list
-        return self.alloc_pool(1);
-    }
-
-    pub fn alloc_pool(self: *Self, n: u64) !u64 {
-        const page = self.next_free;
-        const allocation_size = PAGE_SIZE * n;
-        self.next_free += allocation_size;
-        if (self.next_free >= self.limit) {
-            self.next_free -= allocation_size;
-            return OutOfMemory;
-        }
-        std.debug.assert(std.mem.isAligned(page, PAGE_SIZE));
-        return page;
-    }
-
-    pub fn free_frame(self: *Self, addr: u64) void {
-        std.debug.assert(std.mem.isAligned(addr, PAGE_SIZE));
-        const virt_addr = IdentityMapping.phys_to_virt(addr);
-        const node = @intToPtr(*@TypeOf(self.freelist).Node, virt_addr);
-        self.freelist.prepend(node);
-    }
-};
-
-var main_allocator: FrameAllocator = undefined;
-
-pub fn frameAllocator() *FrameAllocator {
+pub fn frameAllocator() *mm.FrameAllocator {
     return &main_allocator;
 }
 
-pub fn init(phys_mem: MemoryRange) void {
-    main_allocator = FrameAllocator.new(phys_mem);
-}
-
-pub const MemoryRange = struct {
-    base: u64,
-    size: u64,
-
-    pub fn get_end(self: @This()) u64 {
-        return self.base + self.size;
-    }
-
-    pub fn from_range(start: u64, end: u64) MemoryRange {
-        std.debug.assert(start < end);
-        const size = end - start;
-        return .{ .base = start, .size = size };
-    }
-};
-
-pub fn detect_memory() ?MemoryRange {
+pub fn detect_memory() ?mm.MemoryRange {
     if (x86.multiboot.info_pointer) |mbinfo| {
         return detect_multiboot_memory(mbinfo);
     }
@@ -132,7 +39,7 @@ fn bit_set(value: var, comptime bit: usize) bool {
     return ((value >> bit) & 1) != 0;
 }
 
-fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?MemoryRange {
+fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?mm.MemoryRange {
     if (!bit_set(mb_info.flags, 6)) {
         @panic("Missing memory map!");
     }
@@ -146,14 +53,14 @@ fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?MemoryRange {
         type_: u32,
     };
 
-    var best_slot: ?MemoryRange = null;
+    var best_slot: ?mm.MemoryRange = null;
 
-    var offset = mb_info.mmap_addr;
-    const mmap_end = mb_info.mmap_addr + mb_info.mmap_length;
+    var offset = mm.PhysicalAddress.new(mb_info.mmap_addr);
+    const mmap_end = mm.PhysicalAddress.new(mb_info.mmap_addr + mb_info.mmap_length);
 
     printk("BIOS memory map:\n", .{});
-    while (offset < mmap_end) {
-        const entry = @intToPtr(*MemEntry, x86.mm.EarlyMapping.phys_to_virt(offset));
+    while (offset.lt(mmap_end)) {
+        const entry = x86.mm.identityMapping().to_virt(offset).into_pointer(MemEntry);
 
         const start = entry.base_addr;
         const end = start + entry.length - 1;
@@ -165,9 +72,9 @@ fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?MemoryRange {
             else => "Reserved",
         };
         printk("[{x:0>10}-{x:0>10}] {}\n", .{ start, end, status });
-        offset += entry.size + @sizeOf(@TypeOf(entry.size));
+        offset = offset.add(entry.size + @sizeOf(@TypeOf(entry.size)));
 
-        const this_slot = MemoryRange{ .base = entry.base_addr, .size = entry.length };
+        const this_slot = mm.MemoryRange{ .base = mm.PhysicalAddress.new(start), .size = entry.length };
 
         if (best_slot) |slot| {
             if (this_slot.size > slot.size) {
@@ -179,4 +86,26 @@ fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?MemoryRange {
     }
 
     return best_slot;
+}
+
+pub fn init() void {
+    const mem = x86.mm.detect_memory();
+    if (mem == null) {
+        @panic("Unable to find any free memory!");
+    }
+    var free_memory = mem.?;
+
+    // Ensure we don't overwrite kernel
+    const kend = x86.mm.identityMapping().to_phys(x86.mm.get_kernel_end());
+    // Move beginning to after kernel
+    const begin = kend.max(free_memory.base);
+    const adjusted_memory = mm.MemoryRange.from_range(begin, free_memory.get_end());
+
+    printk("Detected {}MiB of free memory\n", .{adjusted_memory.size / 1024 / 1024});
+
+    main_allocator = mm.FrameAllocator.new(adjusted_memory);
+    kernel_vm = mm.VirtualMemory.init(&main_allocator);
+
+    const addr = mm.frameAllocator().alloc_frame();
+    printk("{x}\n", .{addr});
 }
