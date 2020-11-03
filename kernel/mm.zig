@@ -42,6 +42,10 @@ pub const VirtualAddress = struct {
         return .{ .value = val + self.value };
     }
 
+    pub fn sub(self: @This(), val: Type) VirtualAddress {
+        return .{ .value = val + self.value };
+    }
+
     pub fn le(self: @This(), other: VirtualAddress) bool {
         return self.value <= other.value;
     }
@@ -50,11 +54,19 @@ pub const VirtualAddress = struct {
         return self.value < other.value;
     }
 
+    pub fn span(from: VirtualAddress, to: VirtualAddress) usize {
+        return to.value - from.value;
+    }
+
     pub fn format(self: @This(), fmt: []const u8, options: std.fmt.FormatOptions, stream: var) !void {
         try stream.writeAll(@typeName(@This()));
         try stream.writeAll("{");
         try std.fmt.formatInt(self.value, 16, false, options, stream);
         try stream.writeAll("}");
+    }
+
+    pub fn isAligned(self: @This(), val: var) bool {
+        return std.mem.isAligned(self.value, val);
     }
 };
 
