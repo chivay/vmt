@@ -613,6 +613,51 @@ fn dump_mm() void {
     }
 }
 
+fn setup_kernel_vm() !void {
+    // Initialize generic kernel VM
+    mm.kernel_vm = mm.VirtualMemory.init(&kernel_vm_impl);
+
+    // Initial 1GiB mapping
+    printk("Identity mapping 1GiB from 0 phys\n", .{});
+    const initial_mapping_size = mm.GiB(1);
+    try kernel_vm_impl.identity_map(
+        IDENTITY_MAPPING_START,
+        PhysicalAddress.new(0x0),
+        initial_mapping_size,
+    );
+
+    // Map kernel image
+    printk("Mapping kernel image\n", .{});
+    const kern_end = VirtualAddress.new(@ptrToInt(&kernel_end));
+    const kernel_size = VirtualAddress.span(KERNEL_IMAGE_START, kern_end);
+    mm.kernel_vm.map_addr(
+        KERNEL_IMAGE_START,
+        PhysicalAddress.new(0),
+        std.mem.alignForward(kernel_size, mm.MiB(2)),
+    ) catch |err| {
+        printk("{}\n", .{err});
+        @panic("Failed to remap kernel");
+    };
+
+    //kernel_vm_impl.pml4.walk(visitor);
+
+    identityMapping().virt_start = IDENTITY_MAPPING_START;
+    identityMapping().size = initial_mapping_size;
+
+    // switch to new virtual memory
+    mm.kernel_vm.switch_to();
+    printk("Survived switching to kernel VM\n", .{});
+
+    printk("Mapping rest of identity\n", .{});
+    try kernel_vm_impl.identity_map(
+        IDENTITY_MAPPING_START.add(initial_mapping_size),
+        PhysicalAddress.new(0 + initial_mapping_size),
+        mm.GiB(63),
+    );
+
+    //mm.kernel_vm.switch_to();
+}
+
 pub fn init() void {
     const mem = x86.mm.detect_memory();
     if (mem == null) {
@@ -630,9 +675,16 @@ pub fn init() void {
 
     //dump_mm();
 
+    // Initialize physical memory allocator
     main_allocator = mm.FrameAllocator.new(adjusted_memory);
-    kernel_vm = mm.VirtualMemory.init(&main_allocator);
+    // Initialize x86 VM implementation
+    kernel_vm_impl = VirtualMemoryImpl.init(&main_allocator) catch |err| {
+        @panic("Failed to initialize VM implementation");
+    };
 
-    const addr = mm.frameAllocator().alloc_frame();
-    printk("{x}\n", .{addr});
+    setup_kernel_vm() catch |err| {
+        @panic("Failed to initialize kernel VM implementation");
+    };
+
+    printk("Finished mapping! :)\n", .{});
 }

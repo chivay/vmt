@@ -5,6 +5,10 @@ pub fn identityMapping() *IdentityMapping {
     return arch.mm.identityMapping();
 }
 
+pub fn identityTranslate(phys: PhysicalAddress) VirtualAddress {
+    return identityMapping().to_virt(phys);
+}
+
 pub fn frameAllocator() *FrameAllocator {
     return arch.mm.frameAllocator();
 }
@@ -157,14 +161,21 @@ pub const IdentityMapping = struct {
     }
 };
 
+pub var kernel_vm: VirtualMemory = undefined;
 pub const VirtualMemory = struct {
-    allocator: *FrameAllocator,
+    vm_impl: *arch.mm.VirtualMemoryImpl,
+    const Self = @This();
 
-    pub fn init(frame_allocator: *FrameAllocator) VirtualMemory {
-        return .{ .allocator = frame_allocator };
+    pub fn init(vm_impl: *arch.mm.VirtualMemoryImpl) VirtualMemory {
+        return .{ .vm_impl = vm_impl };
     }
 
-    pub fn map(virt_addr: u64, pfn: u64) !void {}
+    pub fn map_addr(self: Self, where: VirtualAddress, what: PhysicalAddress, length: usize) !void {
+        return self.vm_impl.map_addr(where, what, length);
+    }
+    pub fn switch_to(self: Self) void {
+        self.vm_impl.switch_to();
+    }
 };
 
 pub const FrameAllocator = struct {
