@@ -1,6 +1,7 @@
 const std = @import("std");
 const io = std.io;
-const os = std.os;
+const kernel = @import("root");
+const mm = kernel.mm;
 const x86 = @import("../x86.zig");
 
 var vga_console: ?VGAConsole = null;
@@ -17,7 +18,6 @@ pub const VGADevice = struct {
     const VGA_HEIGHT = 25;
 
     const Buffer = [VGA_HEIGHT][VGA_WIDTH]u16;
-    const buffer: *volatile Buffer = @intToPtr(*Buffer, 0xb8000);
 
     const Color = packed enum(u4) {
         Black = 0,
@@ -40,6 +40,11 @@ pub const VGADevice = struct {
 
     const default_color = make_color(Color.Gray, Color.Black);
 
+    pub fn get_buffer() *Buffer {
+        const phys = mm.PhysicalAddress.new(0xb8000);
+        return mm.identityMapping().to_virt(phys).into_pointer(Buffer);
+    }
+
     pub fn make_color(back: Color, front: Color) u8 {
         const b = @enumToInt(front);
         const f = @enumToInt(back);
@@ -51,7 +56,7 @@ pub const VGADevice = struct {
     }
 
     pub fn put_at(c: u8, x: u16, y: u16) void {
-        buffer[y][x] = make_entry(c, default_color);
+        get_buffer()[y][x] = make_entry(c, default_color);
     }
 
     pub fn clear() void {
@@ -62,9 +67,9 @@ pub const VGADevice = struct {
     }
 
     fn clear_row(idx: u16) void {
-        std.debug.assert(idx < VGADevice.VGA_HEIGHT);
-        const entry = VGADevice.make_entry(' ', VGADevice.default_color);
-        std.mem.set(u16, VGADevice.buffer[idx][0..], entry);
+        std.debug.assert(idx < VGA_HEIGHT);
+        const entry = make_entry(' ', default_color);
+        std.mem.set(u16, get_buffer()[idx][0..], entry);
     }
 
     pub fn scroll_row() void {
@@ -72,8 +77,8 @@ pub const VGADevice = struct {
         var i: u16 = 1;
         while (i < VGADevice.VGA_HEIGHT) : (i += 1) {
             // Copy ith row into i-1th row
-            var dest = VGADevice.buffer[i - 1][0..];
-            var src = VGADevice.buffer[i][0..];
+            var dest = get_buffer()[i - 1][0..];
+            var src = get_buffer()[i][0..];
             std.mem.copy(u16, dest, src);
         }
 
