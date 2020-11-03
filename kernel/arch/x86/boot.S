@@ -179,6 +179,10 @@ start64:
     mov %ax, %fs
     mov %ax, %gs
     mov %ax, %ss
+
+    # Switch stack to high memory
+    mov $0xFFFFFFFF80000000, %rax
+    add %rax, %rsp
     
     #movl $0xb8000, %edi
     #movq $0x1f201f201f201f20, %rax
