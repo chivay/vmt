@@ -187,6 +187,31 @@ pub const FrameAllocator = struct {
         };
     }
 
+    pub fn alloc_zero_frame(self: *Self) !PhysicalAddress {
+        const frame = try self.alloc_frame();
+        const buf = identityMapping().to_virt(frame).into_pointer(*[PAGE_SIZE]u8);
+        std.mem.set(u8, buf, 0);
+
+        return frame;
+    }
+
+    pub fn alloc_zero_aligned(self: *Self, alignment: usize, n: usize) !PhysicalAddress {
+        const frame = try self.alloc_aligned(alignment, n);
+        const buf = identityMapping().to_virt(frame).into_pointer([*]u8);
+        std.mem.set(u8, buf[0..(n * PAGE_SIZE)], 0);
+
+        return frame;
+    }
+
+    pub fn alloc_aligned(self: *Self, alignment: usize, n: usize) !PhysicalAddress {
+        // Skip until we have aligned page
+        while (!self.next_free.isAligned(alignment)) {
+            const frame = try self.alloc_pool(1);
+            self.free_frame(frame);
+        }
+        return self.alloc_pool(n);
+    }
+
     pub fn alloc_frame(self: *Self) !PhysicalAddress {
         // Try allocating from freelist
         if (self.freelist.popFirst()) |node| {
@@ -210,10 +235,10 @@ pub const FrameAllocator = struct {
         return page;
     }
 
-    pub fn free_frame(self: *Self, addr: u64) void {
-        std.debug.assert(std.mem.isAligned(addr, PAGE_SIZE));
-        const virt_addr = identityMapping().phys_to_virt(addr);
-        const node = @intToPtr(*@TypeOf(self.freelist).Node, virt_addr);
+    pub fn free_frame(self: *Self, addr: PhysicalAddress) void {
+        std.debug.assert(std.mem.isAligned(addr.value, PAGE_SIZE));
+        const virt_addr = identityMapping().to_virt(addr);
+        const node = virt_addr.into_pointer(*@TypeOf(self.freelist).Node);
         self.freelist.prepend(node);
     }
 };
