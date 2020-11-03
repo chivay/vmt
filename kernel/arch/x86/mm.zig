@@ -5,6 +5,7 @@ const mm = kernel.mm;
 const x86 = @import("../x86.zig");
 
 const PhysicalAddress = mm.PhysicalAddress;
+const VirtualAddress = mm.VirtualAddress;
 
 pub const VirtAddrType = u64;
 pub const PhysAddrType = u64;
@@ -94,6 +95,8 @@ const mask: u64 = ~@as(u64, 0xfff);
 
 pub const PT = struct {
     root: PhysicalAddress,
+    base: ?VirtualAddress,
+    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.identityTranslate,
 
     const EntryType = u64;
     const IdxType = u9;
@@ -113,7 +116,7 @@ pub const PT = struct {
     const Self = @This();
 
     fn get_table(self: Self) *TableFormat {
-        return identityMapping().to_virt(self.root).into_pointer(*TableFormat);
+        return self.phys2virt(self.root).into_pointer(*TableFormat);
     }
 
     pub fn get_page(self: Self, idx: IdxType) ?PhysicalAddress {
@@ -133,13 +136,36 @@ pub const PT = struct {
         self.get_table()[idx] = entry;
     }
 
-    pub fn init(pt: PhysicalAddress) PT {
-        return .{ .root = pt };
+    pub fn init(pt: PhysicalAddress, base: ?VirtualAddress) PT {
+        return .{ .root = pt, .base = base };
     }
+
+    fn walk(self: @This(), func: PageTableVisitor) void {
+        var i: PT.IdxType = 0;
+        while (true) : (i += 1) {
+            const page = self.get_page(i);
+            if (page) |entry| {
+                const virt = self.base.?.add(i * mm.KiB(4));
+                func(virt, entry, PageKind.Page4K);
+            }
+
+            if (i == PT.MaxIndex) {
+                break;
+            }
+        }
+    }
+};
+
+pub const PageKind = enum {
+    Page4K,
+    Page2M,
+    Page1G,
 };
 
 pub const PD = struct {
     root: PhysicalAddress,
+    base: ?VirtualAddress,
+    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.identityTranslate,
 
     const EntryType = u64;
     const IdxType = u9;
@@ -166,7 +192,7 @@ pub const PD = struct {
     };
 
     fn get_table(self: Self) *TableFormat {
-        return identityMapping().to_virt(self.root).into_pointer(*TableFormat);
+        return self.phys2virt(self.root).into_pointer(*TableFormat);
     }
 
     pub fn get_pt(self: Self, idx: IdxType) ?PT {
@@ -174,7 +200,8 @@ pub const PD = struct {
 
         if (bit_set(entry, PRESENT) and !bit_set(entry, PAGE_2M)) {
             // present
-            return PT.init(PhysicalAddress.new(entry & mask));
+            const virt_base = self.base.?.add(idx * mm.MiB(2));
+            return PT.init(PhysicalAddress.new(entry & mask), virt_base);
         }
         return null;
     }
@@ -210,13 +237,36 @@ pub const PD = struct {
         self.get_table()[idx] = entry;
     }
 
-    pub fn init(pd: PhysicalAddress) PD {
-        return .{ .root = pd };
+    pub fn init(pd: PhysicalAddress, base: VirtualAddress) PD {
+        return .{ .root = pd, .base = base };
+    }
+
+    fn walk(self: Self, func: PageTableVisitor) void {
+        var i: PD.IdxType = 0;
+        while (true) : (i += 1) {
+            switch (self.get_entry_kind(i)) {
+                .PageTable => {
+                    const entry = self.get_pt(i).?;
+                    entry.walk(func);
+                },
+                .Page2M => {
+                    const entry = self.get_page_2m(i).?;
+                    func(self.base.?.add(i * mm.MiB(2)), entry, PageKind.Page2M);
+                },
+                else => {},
+            }
+
+            if (i == PD.MaxIndex) {
+                break;
+            }
+        }
     }
 };
 
 pub const PDPT = struct {
     root: PhysicalAddress,
+    base: ?VirtualAddress,
+    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.identityTranslate,
 
     const IdxType = u9;
     const EntryType = u64;
@@ -237,11 +287,15 @@ pub const PDPT = struct {
     const Self = @This();
 
     fn get_table(self: Self) *TableFormat {
-        return identityMapping().to_virt(self.root).into_pointer(*TableFormat);
+        return self.phys2virt(self.root).into_pointer(*TableFormat);
     }
 
     fn get_entry(self: Self, idx: IdxType) EntryType {
         return self.get_table()[idx];
+    }
+
+    pub fn set_entry(self: Self, idx: IdxType, entry: EntryType) void {
+        self.get_table()[idx] = entry;
     }
 
     pub fn get_pd(self: Self, idx: IdxType) ?PD {
@@ -249,18 +303,37 @@ pub const PDPT = struct {
 
         if (bit_set(entry, PRESENT) and !bit_set(entry, PAGE_1G)) {
             // present
-            return PD.init(PhysicalAddress.new(entry & mask));
+            const virt_base = self.base.?.add(mm.GiB(1) * idx);
+            return PD.init(PhysicalAddress.new(entry & mask), virt_base);
         }
         return null;
     }
 
-    pub fn init(pdp: PhysicalAddress) PDPT {
-        return .{ .root = pdp };
+    pub fn init(pdp: PhysicalAddress, base: ?VirtualAddress) PDPT {
+        return .{ .root = pdp, .base = base };
+    }
+
+    fn walk(self: Self, func: PageTableVisitor) void {
+        var i: PDPT.IdxType = 0;
+        while (true) : (i += 1) {
+            const pd = self.get_pd(i);
+            if (pd) |entry| {
+                entry.walk(func);
+            }
+
+            if (i == PDPT.MaxIndex) {
+                break;
+            }
+        }
     }
 };
 
 const BitStruct = struct {
     shift: comptime_int,
+
+    pub fn v(comptime self: @This()) comptime_int {
+        return 1 << self.shift;
+    }
 };
 
 pub fn BIT(comptime n: comptime_int) BitStruct {
@@ -269,6 +342,9 @@ pub fn BIT(comptime n: comptime_int) BitStruct {
 
 pub const PML4 = struct {
     root: PhysicalAddress,
+    // Missing base implies 4 level paging scheme
+    base: ?VirtualAddress,
+    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.identityTranslate,
 
     const IdxType = u9;
     const EntryType = u64;
@@ -285,26 +361,180 @@ pub const PML4 = struct {
 
     const NO_EXECUTE = BIT(63);
 
-    fn get_table(self: @This()) *TableFormat {
-        return identityMapping().to_virt(self.root).into_pointer(*TableFormat);
+    const Self = @This();
+
+    pub fn init(pml4: PhysicalAddress, base: ?VirtualAddress) PML4 {
+        return .{ .root = pml4, .base = base };
+    }
+
+    fn get_table(self: Self) *TableFormat {
+        return self.phys2virt(self.root).into_pointer(*TableFormat);
+    }
+
+    /// Some special handling for 48-bit paging
+    fn get_virt_base(self: Self, idx: IdxType) VirtualAddress {
+        const offset = idx * mm.GiB(512);
+        // Easy case, we know the base
+        if (self.base) |base| {
+            return base.add(offset);
+        }
+
+        // Compute high bits
+        if (bit_set(offset, BIT(47))) {
+            return VirtualAddress.new(0xffff000000000000).add(offset);
+        }
+        return VirtualAddress.new(offset);
     }
 
     pub fn get_pdp(self: @This(), idx: IdxType) ?PDPT {
         const entry = self.get_entry(idx);
         if (bit_set(entry, PRESENT)) {
-            return PDPT.init(PhysicalAddress.new(entry & mask));
+            const virt_base = self.get_virt_base(idx);
+            return PDPT.init(PhysicalAddress.new(entry & mask), virt_base);
         }
         return null;
     }
 
-    fn get_entry(self: @This(), idx: IdxType) EntryType {
+    pub fn get_entry(self: @This(), idx: IdxType) EntryType {
         return self.get_table()[idx];
     }
 
-    pub fn init(pml4: PhysicalAddress) PML4 {
-        return .{ .root = pml4 };
+    pub fn set_entry(self: Self, idx: IdxType, entry: EntryType) void {
+        self.get_table()[idx] = entry;
+    }
+
+    fn walk(self: Self, func: PageTableVisitor) void {
+        var i: PML4.IdxType = 0;
+        while (true) : (i = 1) {
+            const pdp = self.get_pdp(i);
+            if (pdp) |entry| {
+                entry.walk(func);
+            }
+
+            if (i == PML4.MaxIndex) {
+                break;
+            }
+        }
     }
 };
+
+const PageTableVisitor = fn (VirtualAddress, PhysicalAddress, PageKind) void;
+fn visitor(virt: VirtualAddress, phys: PhysicalAddress, pk: PageKind) void {
+    printk("{} -> {} ({})\n", .{ virt, phys, pk });
+}
+
+pub const VirtualMemoryImpl = struct {
+    allocator: *mm.FrameAllocator,
+    pml4: PML4,
+
+    const Self = @This();
+
+    const Error = error{
+        InvalidSize,
+        UnalignedAddress,
+        MappingExists,
+    };
+
+    pub fn init(frame_allocator: *mm.FrameAllocator) !VirtualMemoryImpl {
+        const frame = try frame_allocator.alloc_zero_frame();
+
+        return VirtualMemoryImpl{
+            .allocator = frame_allocator,
+            .pml4 = PML4.init(frame, null),
+        };
+    }
+
+    pub fn switch_to(self: Self) void {
+        x86.CR3.write(self.pml4.root.value);
+    }
+
+    fn map_page_2mb(
+        self: Self,
+        where: VirtualAddress,
+        what: PhysicalAddress,
+    ) !void {
+        if (!where.isAligned(mm.MiB(2)) or !what.isAligned(mm.MiB(2))) {
+            return Error.UnalignedAddress;
+        }
+        const pml4_index_ = (where.value >> 39) & 0x1ff;
+        const pdpt_index_ = (where.value >> 30) & 0x1ff;
+        const pd_index_ = (where.value >> 21) & 0x1ff;
+        std.debug.assert(pml4_index_ <= PML4.MaxIndex);
+        std.debug.assert(pdpt_index_ <= PDPT.MaxIndex);
+        std.debug.assert(pd_index_ <= PD.MaxIndex);
+
+        const pml4_index = @intCast(PML4.IdxType, pml4_index_);
+        const pdpt_index = @intCast(PDPT.IdxType, pdpt_index_);
+        const pd_index = @intCast(PD.IdxType, pd_index_);
+
+        if (self.pml4.get_pdp(pml4_index) == null) {
+            printk("Allocated PML4[{}] missing \n", .{pml4_index});
+            const frame = try self.allocator.alloc_zero_frame();
+            printk("Allocated PML4[{}] = {}\n", .{ pml4_index, frame });
+            const v = frame.value | PML4.WRITABLE.v() | PML4.PRESENT.v();
+            self.pml4.set_entry(pml4_index, v);
+        }
+        const pdpt = self.pml4.get_pdp(pml4_index).?;
+
+        if (pdpt.get_pd(pdpt_index) == null) {
+            printk("Allocated PML4[{}] PD[{}] missing \n", .{ pml4_index, pdpt_index });
+            const frame = try self.allocator.alloc_zero_frame();
+            printk("Allocated PML4[{}] PD[{}] = {}\n", .{ pml4_index, pdpt_index, frame });
+            const v = frame.value | PDPT.WRITABLE.v() | PDPT.PRESENT.v();
+            pdpt.set_entry(pdpt_index, v);
+        }
+
+        const pd = pdpt.get_pd(pdpt_index).?;
+        if (pd.get_entry_kind(pd_index) != PD.EntryKind.Missing) {
+            return Error.MappingExists;
+        }
+        pd.set_entry(pd_index, what.value | PD.WRITABLE.v() | PD.PRESENT.v() | PD.PAGE_2M.v());
+    }
+
+    pub fn map_addr(
+        self: Self,
+        where: VirtualAddress,
+        what: PhysicalAddress,
+        length: usize,
+    ) !void {
+        switch (length) {
+            mm.KiB(4) => @panic("Unimplemented"),
+            mm.MiB(2) => return self.map_page_2mb(where, what),
+            mm.GiB(1) => @panic("Unimplemented"),
+            else => return Error.InvalidSize,
+        }
+    }
+
+    pub fn identity_map(
+        self: Self,
+        where: VirtualAddress,
+        what: PhysicalAddress,
+        size: usize,
+    ) !void {
+        const unit = mm.MiB(2);
+        var left = size;
+        var done: usize = 0;
+        while (left != 0) : ({
+            left -= unit;
+            done += unit;
+        }) {
+            mm.kernel_vm.map_addr(
+                where.add(done),
+                what.add(done),
+                unit,
+            ) catch |err| {
+                printk("{}\n", .{err});
+                @panic("Failed to setup identity mapping");
+            };
+        }
+    }
+};
+
+var kernel_vm_impl: VirtualMemoryImpl = undefined;
+
+const IDENTITY_MAPPING_START = VirtualAddress.new(0xffff800000000000);
+// -2GiB
+const KERNEL_IMAGE_START = VirtualAddress.new(0xffffffff80000000);
 
 fn dump_pt(pt: *const PT) void {
     printk("    PT@{x}:\n", .{pt.root.value});
@@ -398,7 +628,7 @@ pub fn init() void {
 
     printk("Detected {}MiB of free memory\n", .{adjusted_memory.size / 1024 / 1024});
 
-    dump_mm();
+    //dump_mm();
 
     main_allocator = mm.FrameAllocator.new(adjusted_memory);
     kernel_vm = mm.VirtualMemory.init(&main_allocator);
