@@ -42,7 +42,7 @@ pub const VGADevice = struct {
 
     pub fn get_buffer() *Buffer {
         const phys = mm.PhysicalAddress.new(0xb8000);
-        return mm.identityMapping().to_virt(phys).into_pointer(Buffer);
+        return mm.identityMapping().to_virt(phys).into_pointer(*Buffer);
     }
 
     pub fn make_color(back: Color, front: Color) u8 {

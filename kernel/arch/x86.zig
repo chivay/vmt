@@ -269,7 +269,7 @@ extern var KERNEL_VIRT_BASE: *align(0x1000) u8;
 
 fn parse_kernel_image() void {
     const elf_hdr = kernel.mm.PhysicalAddress.new(@ptrToInt(&KERNEL_BASE));
-    kernel_image = mm.identityMapping().to_virt(elf_hdr).into_pointer(std.elf.Elf64_Ehdr);
+    kernel_image = mm.identityMapping().to_virt(elf_hdr).into_pointer(*std.elf.Elf64_Ehdr);
 }
 
 export fn multiboot_entry(mb_info: u32) callconv(.C) void {
@@ -284,7 +284,7 @@ export fn multiboot_entry(mb_info: u32) callconv(.C) void {
     // Initialize multiboot info pointer
     const mb_phys = kernel.mm.PhysicalAddress.new(mb_info);
     const mb = mm.identityMapping().to_virt(mb_phys);
-    const info = mb.into_pointer(multiboot.Info);
+    const info = mb.into_pointer(*multiboot.Info);
     multiboot.info_pointer = info;
 
     parse_kernel_image();
