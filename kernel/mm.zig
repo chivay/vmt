@@ -18,11 +18,11 @@ pub fn MiB(comptime bytes: u64) u64 {
 }
 
 pub fn GiB(comptime bytes: u64) u64 {
-    return KiB(bytes) * 1024;
+    return MiB(bytes) * 1024;
 }
 
 pub fn TiB(comptime bytes: u64) u64 {
-    return KiB(bytes) * 1024;
+    return GiB(bytes) * 1024;
 }
 
 pub const VirtualAddress = struct {
