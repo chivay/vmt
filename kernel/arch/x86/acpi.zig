@@ -115,7 +115,7 @@ fn find_rsdp() ?*RSDP {
     // Use correct method (?)
     while (base.lt(limit)) : (base = base.add(16)) {
         //printk("Searching... {}", .{base});
-        const candidate = mm.identityMapping().to_virt(base).into_pointer(RSDP);
+        const candidate = mm.identityMapping().to_virt(base).into_pointer(*RSDP);
         if (candidate.signature_ok()) {
             if (candidate.checksum_ok()) {
                 return candidate;
@@ -136,7 +136,7 @@ pub fn init() void {
     }
     printk("Valid RSDP found\n", .{});
 
-    const rsdt = mm.identityMapping().to_virt(rsdp.?.get_rsdt()).into_pointer(RSDT);
+    const rsdt = mm.identityMapping().to_virt(rsdp.?.get_rsdt()).into_pointer(*RSDT);
     printk("RSDT:\n{*}\n", .{rsdt});
     const pointers = rsdt.get_pointers();
 }

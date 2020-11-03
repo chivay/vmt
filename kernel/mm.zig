@@ -34,8 +34,8 @@ pub const VirtualAddress = struct {
         return .{ .value = value };
     }
 
-    pub fn into_pointer(self: @This(), comptime T: type) *T {
-        return @intToPtr(*T, self.value);
+    pub fn into_pointer(self: @This(), comptime T: type) T {
+        return @intToPtr(T, self.value);
     }
 
     pub fn add(self: @This(), val: Type) VirtualAddress {

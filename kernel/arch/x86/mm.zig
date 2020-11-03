@@ -62,7 +62,7 @@ fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?mm.MemoryRange {
 
     printk("BIOS memory map:\n", .{});
     while (offset.lt(mmap_end)) {
-        const entry = x86.mm.identityMapping().to_virt(offset).into_pointer(MemEntry);
+        const entry = x86.mm.identityMapping().to_virt(offset).into_pointer(*MemEntry);
 
         const start = entry.base_addr;
         const end = start + entry.length - 1;
@@ -113,7 +113,7 @@ pub const PT = struct {
     const Self = @This();
 
     fn get_table(self: Self) *TableFormat {
-        return identityMapping().to_virt(self.root).into_pointer(TableFormat);
+        return identityMapping().to_virt(self.root).into_pointer(*TableFormat);
     }
 
     pub fn get_page(self: Self, idx: IdxType) ?PhysicalAddress {
@@ -166,7 +166,7 @@ pub const PD = struct {
     };
 
     fn get_table(self: Self) *TableFormat {
-        return identityMapping().to_virt(self.root).into_pointer(TableFormat);
+        return identityMapping().to_virt(self.root).into_pointer(*TableFormat);
     }
 
     pub fn get_pt(self: Self, idx: IdxType) ?PT {
@@ -237,7 +237,7 @@ pub const PDPT = struct {
     const Self = @This();
 
     fn get_table(self: Self) *TableFormat {
-        return identityMapping().to_virt(self.root).into_pointer(TableFormat);
+        return identityMapping().to_virt(self.root).into_pointer(*TableFormat);
     }
 
     fn get_entry(self: Self, idx: IdxType) EntryType {
@@ -286,7 +286,7 @@ pub const PML4 = struct {
     const NO_EXECUTE = BIT(63);
 
     fn get_table(self: @This()) *TableFormat {
-        return identityMapping().to_virt(self.root).into_pointer(TableFormat);
+        return identityMapping().to_virt(self.root).into_pointer(*TableFormat);
     }
 
     pub fn get_pdp(self: @This(), idx: IdxType) ?PDPT {
