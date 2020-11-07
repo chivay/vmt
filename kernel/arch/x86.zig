@@ -11,6 +11,7 @@ pub const keyboard = @import("x86/keyboard.zig");
 pub const mm = @import("x86/mm.zig");
 pub const multiboot = @import("x86/multiboot.zig");
 pub const acpi = @import("x86/acpi.zig");
+pub const pci = @import("x86/pci.zig");
 
 pub const logger = kernel.printk_mod.logger("x86");
 
