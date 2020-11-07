@@ -12,6 +12,8 @@ pub const mm = @import("x86/mm.zig");
 pub const multiboot = @import("x86/multiboot.zig");
 pub const acpi = @import("x86/acpi.zig");
 
+pub const logger = kernel.printk_mod.logger("x86");
+
 const GDT = GlobalDescriptorTable(8);
 const IDT = InterruptDescriptorTable;
 
@@ -295,12 +297,11 @@ fn mb_entry(mb_info: u32) callconv(.C) noreturn {
 
     parse_kernel_image();
 
-    printk("CR3: 0x{x}\n", .{CR3.read()});
-    printk("CPU Vendor: {}\n", .{get_vendor_string()});
-    printk("Kernel end: {x}\n", .{mm.get_kernel_end()});
+    logger.log("CR3: 0x{x}\n", .{CR3.read()});
+    logger.log("CPU Vendor: {}\n", .{get_vendor_string()});
+    logger.log("Kernel end: {x}\n", .{mm.get_kernel_end()});
 
-    printk("Booting the kernel...\n", .{});
-
+    logger.log("Booting the kernel...\n", .{});
     kernel.kmain();
 
     hang();
@@ -434,16 +435,16 @@ export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFra
     switch (interrupt_num) {
         // Breakpoint
         0x3 => {
-            printk("BREAKPOINT\n", .{});
-            printk("======================\n", .{});
-            printk("{}\n", .{frame});
-            printk("======================\n", .{});
+            logger.log("BREAKPOINT\n", .{});
+            logger.log("======================\n", .{});
+            logger.log("{}\n", .{frame});
+            logger.log("======================\n", .{});
         },
         0x31 => {
-            printk("{x}\n", .{frame});
+            logger.log("{x}\n", .{frame});
             keyboard_echo();
         },
-        else => printk("Received unknown interrupt {}\n", .{interrupt_num}),
+        else => logger.log("Received unknown interrupt {}\n", .{interrupt_num}),
     }
 }
 
