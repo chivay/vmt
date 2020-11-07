@@ -78,6 +78,9 @@ fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?mm.MemoryRange {
         logger.log("[{x:0>10}-{x:0>10}] {}\n", .{ start, end, status });
         offset = offset.add(entry.size + @sizeOf(@TypeOf(entry.size)));
 
+        if (entry.type_ != 1) {
+            continue;
+        }
         const this_slot = mm.MemoryRange{ .base = mm.PhysicalAddress.new(start), .size = entry.length };
 
         if (best_slot) |slot| {
@@ -653,6 +656,9 @@ fn setup_kernel_vm() !void {
         PhysicalAddress.new(0 + initial_mapping_size),
         mm.GiB(63),
     );
+
+    identityMapping().virt_start = IDENTITY_MAPPING_START;
+    identityMapping().size = mm.GiB(64);
 
     mm.kernel_vm.switch_to();
 }
