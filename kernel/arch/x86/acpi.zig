@@ -1,6 +1,7 @@
 const std = @import("std");
 const kernel = @import("root");
 const printk = kernel.printk;
+const logger = @import("../x86.zig").logger.childOf(@typeName(@This()));
 const mm = kernel.mm;
 
 const PhysicalAddress = kernel.mm.PhysicalAddress;
@@ -114,29 +115,29 @@ fn find_rsdp() ?*RSDP {
 
     // Use correct method (?)
     while (base.lt(limit)) : (base = base.add(16)) {
-        //printk("Searching... {}", .{base});
+        //logger.log("Searching... {}", .{base});
         const candidate = mm.identityMapping().to_virt(base).into_pointer(*RSDP);
         if (candidate.signature_ok()) {
             if (candidate.checksum_ok()) {
                 return candidate;
             }
-            printk("{*} signature OK, checksum mismatch\n", .{candidate});
+            logger.log("{*} signature OK, checksum mismatch\n", .{candidate});
         }
     }
     return null;
 }
 
 pub fn init() void {
-    printk("Initializing ACPI\n", .{});
+    logger.log("Initializing ACPI\n", .{});
 
     const rsdp = find_rsdp();
     if (rsdp == null) {
-        printk("Failed to find a RSDP\n", .{});
+        logger.log("Failed to find a RSDP\n", .{});
         return;
     }
-    printk("Valid RSDP found\n", .{});
+    logger.log("Valid RSDP found\n", .{});
 
     const rsdt = mm.identityMapping().to_virt(rsdp.?.get_rsdt()).into_pointer(*RSDT);
-    printk("RSDT:\n{*}\n", .{rsdt});
+    logger.log("RSDT:\n{*}\n", .{rsdt});
     const pointers = rsdt.get_pointers();
 }

@@ -27,3 +27,25 @@ pub fn printk(comptime fmt: []const u8, args: var) void {
     std.fmt.format(out_stream, fmt, args) catch |err| {};
     do_printk(fbs.getWritten());
 }
+
+pub const LogLevel = enum {
+    CRITICAL,
+    ERROR,
+    WARNING,
+    INFO,
+    DEBUG,
+};
+
+pub fn logger(comptime prefix: []const u8) type {
+    return struct {
+        const PREFIX = prefix;
+
+        pub fn log(comptime fmt: []const u8, args: var) void {
+            printk(PREFIX ++ ": " ++ fmt, args);
+        }
+
+        pub fn childOf(child_prefix: []const u8) type {
+            return logger(PREFIX ++ "." ++ child_prefix);
+        }
+    };
+}

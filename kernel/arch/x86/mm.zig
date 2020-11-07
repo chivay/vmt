@@ -1,11 +1,12 @@
 const std = @import("std");
 const kernel = @import("root");
-const printk = kernel.printk;
 const mm = kernel.mm;
 const x86 = @import("../x86.zig");
 
 const PhysicalAddress = mm.PhysicalAddress;
 const VirtualAddress = mm.VirtualAddress;
+
+const logger = x86.logger.childOf(@typeName(@This()));
 
 pub const VirtAddrType = u64;
 pub const PhysAddrType = u64;
@@ -61,7 +62,7 @@ fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?mm.MemoryRange {
     var offset = mm.PhysicalAddress.new(mb_info.mmap_addr);
     const mmap_end = mm.PhysicalAddress.new(mb_info.mmap_addr + mb_info.mmap_length);
 
-    printk("BIOS memory map:\n", .{});
+    logger.log("BIOS memory map:\n", .{});
     while (offset.lt(mmap_end)) {
         const entry = x86.mm.identityMapping().to_virt(offset).into_pointer(*MemEntry);
 
@@ -74,7 +75,7 @@ fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?mm.MemoryRange {
             5 => "Defective",
             else => "Reserved",
         };
-        printk("[{x:0>10}-{x:0>10}] {}\n", .{ start, end, status });
+        logger.log("[{x:0>10}-{x:0>10}] {}\n", .{ start, end, status });
         offset = offset.add(entry.size + @sizeOf(@TypeOf(entry.size)));
 
         const this_slot = mm.MemoryRange{ .base = mm.PhysicalAddress.new(start), .size = entry.length };
@@ -420,7 +421,7 @@ pub const PML4 = struct {
 
 const PageTableVisitor = fn (VirtualAddress, PhysicalAddress, PageKind) void;
 fn visitor(virt: VirtualAddress, phys: PhysicalAddress, pk: PageKind) void {
-    printk("{} -> {} ({})\n", .{ virt, phys, pk });
+    logger.log("{} -> {} ({})\n", .{ virt, phys, pk });
 }
 
 pub const VirtualMemoryImpl = struct {
@@ -468,18 +469,18 @@ pub const VirtualMemoryImpl = struct {
         const pd_index = @intCast(PD.IdxType, pd_index_);
 
         if (self.pml4.get_pdp(pml4_index) == null) {
-            printk("Allocated PML4[{}] missing \n", .{pml4_index});
+            //logger.log("Allocated PML4[{}] missing \n", .{pml4_index});
             const frame = try self.allocator.alloc_zero_frame();
-            printk("Allocated PML4[{}] = {}\n", .{ pml4_index, frame });
+            //logger.log("Allocated PML4[{}] = {}\n", .{ pml4_index, frame });
             const v = frame.value | PML4.WRITABLE.v() | PML4.PRESENT.v();
             self.pml4.set_entry(pml4_index, v);
         }
         const pdpt = self.pml4.get_pdp(pml4_index).?;
 
         if (pdpt.get_pd(pdpt_index) == null) {
-            printk("Allocated PML4[{}] PD[{}] missing \n", .{ pml4_index, pdpt_index });
+            //logger.log("Allocated PML4[{}] PD[{}] missing \n", .{ pml4_index, pdpt_index });
             const frame = try self.allocator.alloc_zero_frame();
-            printk("Allocated PML4[{}] PD[{}] = {}\n", .{ pml4_index, pdpt_index, frame });
+            //logger.log("Allocated PML4[{}] PD[{}] = {}\n", .{ pml4_index, pdpt_index, frame });
             const v = frame.value | PDPT.WRITABLE.v() | PDPT.PRESENT.v();
             pdpt.set_entry(pdpt_index, v);
         }
@@ -523,7 +524,7 @@ pub const VirtualMemoryImpl = struct {
                 what.add(done),
                 unit,
             ) catch |err| {
-                printk("{}\n", .{err});
+                logger.log("{}\n", .{err});
                 @panic("Failed to setup identity mapping");
             };
         }
@@ -537,13 +538,13 @@ const IDENTITY_MAPPING_START = VirtualAddress.new(0xffff800000000000);
 const KERNEL_IMAGE_START = VirtualAddress.new(0xffffffff80000000);
 
 fn dump_pt(pt: *const PT) void {
-    printk("    PT@{x}:\n", .{pt.root.value});
+    logger.log("    PT@{x}:\n", .{pt.root.value});
 
     var i: PT.IdxType = 0;
     while (true) : (i += 1) {
         const page = pt.get_page(i);
         if (page) |entry| {
-            printk("  [{:3}] {x:0>16}\n", .{ i, entry.value });
+            logger.log("  [{:3}] {x:0>16}\n", .{ i, entry.value });
         }
 
         if (i == PT.MaxIndex) {
@@ -554,19 +555,19 @@ fn dump_pt(pt: *const PT) void {
 
 fn dump_pd(pd: *const PD) void {
     const indent = " " ** 4;
-    printk(indent ++ "PD@{x}:\n", .{pd.root.value});
+    logger.log(indent ++ "PD@{x}:\n", .{pd.root.value});
 
     var i: PD.IdxType = 0;
     while (true) : (i += 1) {
         switch (pd.get_entry_kind(i)) {
             .PageTable => {
                 const entry = pd.get_pt(i).?;
-                printk(indent ++ "[{:3}] {x:0>16}\n", .{ i, entry.root.value });
+                logger.log(indent ++ "[{:3}] {x:0>16}\n", .{ i, entry.root.value });
                 dump_pt(&entry);
             },
             .Page2M => {
                 const entry = pd.get_page_2m(i).?;
-                printk(indent ++ "[{:3}] {x} - 2MiB\n", .{ i, entry });
+                logger.log(indent ++ "[{:3}] {x} - 2MiB\n", .{ i, entry });
             },
             else => {},
         }
@@ -578,13 +579,13 @@ fn dump_pd(pd: *const PD) void {
 }
 
 fn dump_pdpt(pdpt: *const PDPT) void {
-    printk("  PDPT@{x}:\n", .{pdpt.root.value});
+    logger.log("  PDPT@{x}:\n", .{pdpt.root.value});
 
     var i: PDPT.IdxType = 0;
     while (true) : (i += 1) {
         const pd = pdpt.get_pd(i);
         if (pd) |entry| {
-            printk("  [{:3}] {x:0>16}\n", .{ i, entry.root.value });
+            logger.log("  [{:3}] {x:0>16}\n", .{ i, entry.root.value });
             dump_pd(&entry);
         }
 
@@ -597,13 +598,13 @@ fn dump_pdpt(pdpt: *const PDPT) void {
 fn dump_mm() void {
     const base = PhysicalAddress.new(x86.CR3.read() & mask);
     const paging = PML4.init(base);
-    printk("PML4@{x}:\n", .{base});
+    logger.log("PML4@{x}:\n", .{base});
 
     var i: PML4.IdxType = 0;
     while (true) : (i += 1) {
         const pdp = paging.get_pdp(i);
         if (pdp) |entry| {
-            printk("[{:3}] {x:0>16}\n", .{ i, entry.root.value });
+            logger.log("[{:3}] {x:0>16}\n", .{ i, entry.root.value });
             dump_pdpt(&entry);
         }
 
@@ -618,7 +619,7 @@ fn setup_kernel_vm() !void {
     mm.kernel_vm = mm.VirtualMemory.init(&kernel_vm_impl);
 
     // Initial 1GiB mapping
-    printk("Identity mapping 1GiB from 0 phys\n", .{});
+    logger.log("Identity mapping 1GiB from 0 phys\n", .{});
     const initial_mapping_size = mm.GiB(1);
     try kernel_vm_impl.identity_map(
         IDENTITY_MAPPING_START,
@@ -627,7 +628,7 @@ fn setup_kernel_vm() !void {
     );
 
     // Map kernel image
-    printk("Mapping kernel image\n", .{});
+    logger.log("Mapping kernel image\n", .{});
     const kern_end = VirtualAddress.new(@ptrToInt(&kernel_end));
     const kernel_size = VirtualAddress.span(KERNEL_IMAGE_START, kern_end);
     mm.kernel_vm.map_addr(
@@ -635,27 +636,25 @@ fn setup_kernel_vm() !void {
         PhysicalAddress.new(0),
         std.mem.alignForward(kernel_size, mm.MiB(2)),
     ) catch |err| {
-        printk("{}\n", .{err});
+        logger.log("{}\n", .{err});
         @panic("Failed to remap kernel");
     };
-
-    //kernel_vm_impl.pml4.walk(visitor);
 
     identityMapping().virt_start = IDENTITY_MAPPING_START;
     identityMapping().size = initial_mapping_size;
 
     // switch to new virtual memory
     mm.kernel_vm.switch_to();
-    printk("Survived switching to kernel VM\n", .{});
+    logger.log("Survived switching to kernel VM\n", .{});
 
-    printk("Mapping rest of identity\n", .{});
+    logger.log("Mapping rest of identity\n", .{});
     try kernel_vm_impl.identity_map(
         IDENTITY_MAPPING_START.add(initial_mapping_size),
         PhysicalAddress.new(0 + initial_mapping_size),
         mm.GiB(63),
     );
 
-    //mm.kernel_vm.switch_to();
+    mm.kernel_vm.switch_to();
 }
 
 pub fn init() void {
@@ -671,7 +670,7 @@ pub fn init() void {
     const begin = kend.max(free_memory.base);
     const adjusted_memory = mm.MemoryRange.from_range(begin, free_memory.get_end());
 
-    printk("Detected {}MiB of free memory\n", .{adjusted_memory.size / 1024 / 1024});
+    logger.log("Detected {}MiB of free memory\n", .{adjusted_memory.size / 1024 / 1024});
 
     //dump_mm();
 
@@ -686,5 +685,5 @@ pub fn init() void {
         @panic("Failed to initialize kernel VM implementation");
     };
 
-    printk("Finished mapping! :)\n", .{});
+    logger.log("Memory subsystem initialized\n", .{});
 }
