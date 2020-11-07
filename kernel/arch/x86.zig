@@ -272,7 +272,13 @@ fn parse_kernel_image() void {
     kernel_image = mm.identityMapping().to_virt(elf_hdr).into_pointer(*std.elf.Elf64_Ehdr);
 }
 
-export fn multiboot_entry(mb_info: u32) callconv(.C) void {
+var stack: [16 * 0x1000]u8 align(0x10) = undefined;
+
+export fn multiboot_entry(mb_info: u32) callconv(.C) noreturn {
+    @call(.{ .stack = stack[0..] }, mb_entry, .{mb_info});
+}
+
+fn mb_entry(mb_info: u32) callconv(.C) noreturn {
     kernel.printk_mod.register_sink(&vga_node);
     kernel.printk_mod.register_sink(&serial_node);
 
@@ -296,6 +302,8 @@ export fn multiboot_entry(mb_info: u32) callconv(.C) void {
     printk("Booting the kernel...\n", .{});
 
     kernel.kmain();
+
+    hang();
 }
 
 pub fn idle() void {

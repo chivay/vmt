@@ -1,6 +1,5 @@
 
 # Misc constants
-.set STACK_SIZE, 0x20000
 .set IA32_EFER, 0xC0000080
 
 # Multiboot constants
@@ -30,6 +29,11 @@
 
 .set NORMAL_ENTRY,  (ENTRY_PRESENT | ENTRY_WRITABLE)
 .set LARGE_ENTRY, (ENTRY_PRESENT | ENTRY_WRITABLE | ENTRY_LARGE)
+
+
+.align 0x10
+    .skip 0x100
+boot_stack:
 
 
 .align 0x1000
@@ -74,12 +78,6 @@ initialize_page_tables:
 
     ret
 
-fixup_page_tables:
-.type initialize_page_tables, @function
-    .code64
-
-    ret
-
 .global multiboot_start
 .type multiboot_start, @function
 multiboot_start:
@@ -96,7 +94,7 @@ multiboot_start:
     # IDTR - don't enable interrupts until it's set up
     # set up stack
 
-    movl $STACK_SIZE + stack, %esp
+    movl $boot_stack, %esp
     call initialize_page_tables
 
     # set PAE - Physical Address Extension bit in CR4
@@ -119,12 +117,6 @@ multiboot_start:
     lgdt (GDT64_PTR)
     ljmp $GDT64_CODE_SEG, $START64_ADDR
 
-
-.section .boot.bss, "a", @nobits
-.align 16
-    .lcomm stack_begin, STACK_SIZE
-.global stack
-stack:
 
 .section .boot.data, "a"
 GDT64:
@@ -180,17 +172,5 @@ start64:
     mov %ax, %gs
     mov %ax, %ss
 
-    # Switch stack to high memory
-    mov $0xFFFFFFFF80000000, %rax
-    add %rax, %rsp
-    
-    #movl $0xb8000, %edi
-    #movq $0x1f201f201f201f20, %rax
-    #mov $500, %ecx
-    #rep stosq
-
     mov %ebx, %edi
-    call multiboot_entry
-
-    cli
-    hlt
+    jmp multiboot_entry
