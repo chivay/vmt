@@ -405,7 +405,7 @@ pub const PML4 = struct {
 
     fn walk(self: Self, func: PageTableVisitor) void {
         var i: PML4.IdxType = 0;
-        while (true) : (i = 1) {
+        while (true) : (i += 1) {
             const pdp = self.get_pdp(i);
             if (pdp) |entry| {
                 entry.walk(func);
