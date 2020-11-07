@@ -25,6 +25,8 @@ const RSDP = extern struct {
     reserveda: [3]u8,
 
     pub fn get_rsdt(self: @This()) PhysicalAddress {
+        std.debug.assert(self.signature_ok());
+        std.debug.assert(self.checksum_ok());
         return PhysicalAddress.new(self.rsdt_address);
     }
 
@@ -59,6 +61,7 @@ const RSDP = extern struct {
 
 comptime {
     const Struct = RSDP;
+    // Zig compiler is a little broken for packed structs :<
     //std.debug.assert(@sizeOf(Struct) == 36);
     std.debug.assert(@byteOffsetOf(Struct, "signature") == 0);
     std.debug.assert(@byteOffsetOf(Struct, "checksum") == 8);
@@ -68,12 +71,14 @@ comptime {
     std.debug.assert(@byteOffsetOf(Struct, "length") == 20);
 }
 
-const SDTHeader = extern struct {
+const SDTHeader = packed struct {
     signature: [4]u8,
     length: u32,
     revision: u8,
     checksum: u8,
-    oemid: [6]u8,
+    // Zig compiler bug workaround - fields can only have a power of 2 size
+    oemid_a: [4]u8,
+    oemid_b: [2]u8,
     oemtableid: [8]u8,
     oemrevision: u32,
     creatorid: u32,
@@ -82,31 +87,66 @@ const SDTHeader = extern struct {
 
 comptime {
     const Struct = SDTHeader;
-    //std.debug.assert(@sizeOf(Struct) == 36);
+    std.debug.assert(@sizeOf(Struct) == 36);
     std.debug.assert(@byteOffsetOf(Struct, "signature") == 0);
     std.debug.assert(@byteOffsetOf(Struct, "length") == 4);
     std.debug.assert(@byteOffsetOf(Struct, "revision") == 8);
     std.debug.assert(@byteOffsetOf(Struct, "checksum") == 9);
-    std.debug.assert(@byteOffsetOf(Struct, "oemid") == 10);
+    std.debug.assert(@byteOffsetOf(Struct, "oemid_a") == 10);
     std.debug.assert(@byteOffsetOf(Struct, "oemtableid") == 16);
     std.debug.assert(@byteOffsetOf(Struct, "oemrevision") == 24);
     std.debug.assert(@byteOffsetOf(Struct, "creatorid") == 28);
     std.debug.assert(@byteOffsetOf(Struct, "creatorrevision") == 32);
 }
 
-comptime {
-    std.debug.assert(@sizeOf(SDTHeader) == 36);
-}
-
-const RSDT = extern struct {
-    header: SDTHeader,
-
-    pub fn get_pointers(self: @This()) []u32 {
-        const entries = (self.header.length - @sizeOf(@TypeOf(self.header))) / @sizeOf(u32);
-        const array = @intToPtr([*]u32, @ptrToInt(&self) + @sizeOf(SDTHeader));
-
-        return array[0..entries];
-    }
+const FADTData = packed struct {
+    firmware_ctrl: u32,
+    dsdt: u32,
+    reserved: u8,
+    preferred_pm_profile: u8,
+    sci_int: u16,
+    smi_cmd: u32,
+    acpi_enable: u8,
+    acpi_disable: u8,
+    s4bios_req: u8,
+    pstate_cnt: u8,
+    pm1a_evt_blk: u32,
+    pm1b_evt_blk: u32,
+    pm1a_cnt_blk: u32,
+    pm1b_cnt_blk: u32,
+    pm2_cnt_blk: u32,
+    pm2_tmr_blk: u32,
+    gpe0_blk: u32,
+    gpe1_blk: u32,
+    pm1_evt_len: u8,
+    pm1_cnt_len: u8,
+    pm2_cnt_len: u8,
+    pm_tmr_len: u8,
+    gpe0_blk_len: u8,
+    gpe1_blk_len: u8,
+    gpe1_base: u8,
+    cst_cnt: u8,
+    p_lvl2_lat: u16,
+    p_lvl3_lat: u16,
+    flush_size: u16,
+    flush_stride: u16,
+    duty_offset: u8,
+    duty_width: u8,
+    day_alrm: u8,
+    mon_alrm: u8,
+    century: u8,
+    iapc_boot_arch: u16,
+    reserved_: u8,
+    flags: u32,
+    // Zig bug workaround
+    reset_reg_low: u64,
+    reset_reg_high: u32,
+    reset_value: u8,
+    arm_boot_arch: u16,
+    fadt_minor_version: u8,
+    x_firmware_ctrl: u64,
+    x_dsdt: u64,
+    // TODO rest
 };
 
 fn find_rsdp() ?*RSDP {
@@ -127,6 +167,74 @@ fn find_rsdp() ?*RSDP {
     return null;
 }
 
+pub fn hexdump(bytes: []const u8) void {
+    logger.log("{x}\n", .{bytes});
+}
+
+fn parse_fadt(header: *SDTHeader) void {
+    logger.log("Parsing FADT\n", .{});
+    const data = @intToPtr(*FADTData, @ptrToInt(header) + @sizeOf(SDTHeader));
+    //logger.log("{x}\n", .{data});
+}
+
+const MCFGEntry = packed struct {
+    base_address: u64,
+    pci_segment_group: u16,
+    start_bus: u8,
+    end_bus: u8,
+    reserved: u32,
+};
+
+fn mmio_read(comptime T: type, addr: PhysicalAddress) T {
+    const mmio_addr = @ptrCast(*volatile T, addr.value);
+    return mmio_addr.*;
+}
+
+pub var mcfg_entry: ?*MCFGEntry = null;
+
+fn parse_mcfg(header: *SDTHeader) void {
+    logger.log("Parsing MCFG\n", .{});
+    // 8 bytes of reserved field
+    const data_length = header.length - @sizeOf(SDTHeader) - 8;
+    var data = @intToPtr([*]u8, @ptrToInt(header) + @sizeOf(SDTHeader) + 8)[0..data_length];
+    while (data.len >= @sizeOf(MCFGEntry)) : (data = data[@sizeOf(MCFGEntry)..]) {
+        const entry = @ptrCast(*MCFGEntry, data);
+        mcfg_entry = entry;
+    }
+}
+fn parse_apic(header: *SDTHeader) void {}
+fn parse_hpet(header: *SDTHeader) void {}
+
+pub fn parse_table(addr: PhysicalAddress) void {
+    const header = mm.identityMapping().to_virt(addr).into_pointer(*SDTHeader);
+    if (std.mem.eql(u8, header.signature[0..], "FACP")) {
+        parse_fadt(header);
+    } else if (std.mem.eql(u8, header.signature[0..], "MCFG")) {
+        parse_mcfg(header);
+    } else if (std.mem.eql(u8, header.signature[0..], "HPET")) {
+        parse_hpet(header);
+    } else if (std.mem.eql(u8, header.signature[0..], "APIC")) {
+        parse_apic(header);
+    } else {
+        logger.log("Unknown signature {}\n", .{header.signature});
+    }
+}
+
+fn parse_rsdt(rsdt: *SDTHeader) void {
+    var ptr_slice = @ptrCast([*]u8, rsdt)[@sizeOf(SDTHeader)..rsdt.length];
+
+    const PointerType = u32;
+    const pointerSize = @sizeOf(PointerType);
+
+    while (ptr_slice.len >= pointerSize) : (ptr_slice = ptr_slice[pointerSize..]) {
+        const addr = PhysicalAddress.new(std.mem.readIntSliceNative(
+            PointerType,
+            ptr_slice[0..pointerSize],
+        ));
+        parse_table(addr);
+    }
+}
+
 pub fn init() void {
     logger.log("Initializing ACPI\n", .{});
 
@@ -136,8 +244,6 @@ pub fn init() void {
         return;
     }
     logger.log("Valid RSDP found\n", .{});
-
-    const rsdt = mm.identityMapping().to_virt(rsdp.?.get_rsdt()).into_pointer(*RSDT);
-    logger.log("RSDT:\n{*}\n", .{rsdt});
-    const pointers = rsdt.get_pointers();
+    const rsdt = mm.identityMapping().to_virt(rsdp.?.get_rsdt()).into_pointer(*SDTHeader);
+    parse_rsdt(rsdt);
 }
