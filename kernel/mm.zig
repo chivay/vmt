@@ -62,14 +62,14 @@ pub const VirtualAddress = struct {
         return to.value - from.value;
     }
 
-    pub fn format(self: @This(), fmt: []const u8, options: std.fmt.FormatOptions, stream: var) !void {
+    pub fn format(self: @This(), fmt: []const u8, options: std.fmt.FormatOptions, stream: anytype) !void {
         try stream.writeAll(@typeName(@This()));
         try stream.writeAll("{");
         try std.fmt.formatInt(self.value, 16, false, options, stream);
         try stream.writeAll("}");
     }
 
-    pub fn isAligned(self: @This(), val: var) bool {
+    pub fn isAligned(self: @This(), val: anytype) bool {
         return std.mem.isAligned(self.value, val);
     }
 };
@@ -102,11 +102,11 @@ pub const PhysicalAddress = struct {
         return self;
     }
 
-    pub fn isAligned(self: @This(), val: var) bool {
+    pub fn isAligned(self: @This(), val: anytype) bool {
         return std.mem.isAligned(self.value, val);
     }
 
-    pub fn alignForward(self: @This(), val: var) PhysicalAddress {
+    pub fn alignForward(self: @This(), val: anytype) PhysicalAddress {
         return PhysicalAddress.new(std.mem.alignForward(self.value, val));
     }
 
@@ -118,7 +118,7 @@ pub const PhysicalAddress = struct {
         return self.value <= other.value;
     }
 
-    pub fn format(self: @This(), fmt: []const u8, options: std.fmt.FormatOptions, stream: var) !void {
+    pub fn format(self: @This(), fmt: []const u8, options: std.fmt.FormatOptions, stream: anytype) !void {
         try stream.writeAll(@typeName(@This()));
         try stream.writeAll("{");
         try std.fmt.formatInt(self.value, 16, false, options, stream);
@@ -194,7 +194,7 @@ pub const FrameAllocator = struct {
         return .{
             .next_free = memory.base.alignForward(PAGE_SIZE),
             .limit = memory.get_end(),
-            .freelist = std.SinglyLinkedList(void).init(),
+            .freelist = std.SinglyLinkedList(void){ .first = null },
         };
     }
 

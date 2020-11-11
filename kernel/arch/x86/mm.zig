@@ -39,7 +39,7 @@ pub fn detect_memory() ?mm.MemoryRange {
     return null;
 }
 
-fn bit_set(value: var, comptime bit: BitStruct) bool {
+fn bit_set(value: anytype, comptime bit: BitStruct) bool {
     return (value & (1 << bit.shift)) != 0;
 }
 
