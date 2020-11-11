@@ -5,7 +5,7 @@ pub const PrintkSink = fn ([]const u8) void;
 
 pub const SinkNode: type = SinglyLinkedList(PrintkSink).Node;
 
-var printk_sinks = SinglyLinkedList(PrintkSink).init();
+var printk_sinks = SinglyLinkedList(PrintkSink){ .first = null };
 
 pub fn register_sink(sink: *SinkNode) void {
     printk_sinks.prepend(sink);
@@ -22,7 +22,7 @@ var printk_buffer: [0x1000]u8 = undefined;
 var fbs = std.io.fixedBufferStream(&printk_buffer);
 var out_stream = fbs.outStream();
 
-pub fn printk(comptime fmt: []const u8, args: var) void {
+pub fn printk(comptime fmt: []const u8, args: anytype) void {
     fbs.reset();
     std.fmt.format(out_stream, fmt, args) catch |err| {};
     do_printk(fbs.getWritten());
@@ -40,7 +40,7 @@ pub fn logger(comptime prefix: []const u8) type {
     return struct {
         const PREFIX = prefix;
 
-        pub fn log(comptime fmt: []const u8, args: var) void {
+        pub fn log(comptime fmt: []const u8, args: anytype) void {
             printk(PREFIX ++ ": " ++ fmt, args);
         }
 

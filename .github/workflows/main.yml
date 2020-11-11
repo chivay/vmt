@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: mkdir build
-      - uses: docker://euantorano/zig:0.6.0
+      - uses: docker://euantorano/zig:latest
         with:
           entrypoint: zig
           args: build

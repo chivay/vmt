@@ -62,9 +62,9 @@ pub const InterruptDescriptorTable = packed struct {
 
     pub fn load(self: Self) void {
         const init = packed struct {
-                size: u16,
-                base: u64,
-            }{
+            size: u16,
+            base: u64,
+        }{
             .base = @ptrToInt(&self.entries),
             .size = @sizeOf(@TypeOf(self.entries)) - 1,
         };
@@ -188,9 +188,9 @@ pub fn GlobalDescriptorTable(n: u16) type {
 
         pub fn load(self: Self) void {
             const init = packed struct {
-                    size: u16,
-                    base: u64,
-                }{
+                size: u16,
+                base: u64,
+            }{
                 .base = @ptrToInt(&self.entries),
                 .size = @sizeOf(@TypeOf(self.entries)) - 1,
             };
@@ -262,8 +262,8 @@ fn format_to_com1(buffer: []const u8) void {
 
 const Node = kernel.printk_mod.SinkNode;
 
-var vga_node = Node.init(format_to_vga);
-var serial_node = Node.init(format_to_com1);
+var vga_node = Node{ .data = format_to_vga };
+var serial_node = Node{ .data = format_to_com1 };
 
 var kernel_image: *std.elf.Elf64_Ehdr = undefined;
 
