@@ -6,6 +6,7 @@ pub const printk = @import("printk.zig").printk;
 pub const printk_mod = @import("printk.zig");
 pub const mm = @import("mm.zig");
 pub const arch = @import("arch.zig");
+pub const mmio = @import("mmio.zig");
 
 const logger = printk_mod.logger("kernel");
 
