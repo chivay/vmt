@@ -447,7 +447,7 @@ export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFra
     }
 }
 
-var exception_stubs = init: {
+const exception_stubs = init: {
     @setEvalBranchQuota(100000);
     var stubs: [256]InterruptStub = undefined;
 
