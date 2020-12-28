@@ -26,20 +26,27 @@ SECTIONS
 
 
     . += KERNEL_VIRT_BASE;
-    .text : AT(kernel_boot_end) ALIGN(0x1000) { *(.text) } :text
+    .text : AT(kernel_boot_end) ALIGN(0x1000)
+    {
+        *(.text)
+        *(.text.*)
+    } :text
     .rodata : AT((LOADADDR(.text) + SIZEOF(.text) + 0xFFF) & 0xFFFFFFFFFFFFF000) ALIGN(0x1000)
     { 
         *(.rodata)
+        *(.rodata.*)
     } :rodata
 
     .data : AT((LOADADDR(.rodata) + SIZEOF(.rodata) + 0xFFF) & 0xFFFFFFFFFFFFF000) ALIGN(0x1000)
     {
         *(.data)
+        *(.data.*)
     } :data
 
     .bss : AT((LOADADDR(.data) + SIZEOF(.data) + 0xFFF) & 0xFFFFFFFFFFFFF000) ALIGN(0x1000)
     {
         *(.bss)
+        *(.bss.*)
     } :data
 
     . = ALIGN(0x1000);
