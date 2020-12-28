@@ -144,13 +144,13 @@ pub const PT = struct {
         return .{ .root = pt, .base = base };
     }
 
-    fn walk(self: @This(), func: PageTableVisitor) void {
+    fn walk(self: Self, comptime T: type, context: *T) void {
         var i: PT.IdxType = 0;
         while (true) : (i += 1) {
             const page = self.get_page(i);
             if (page) |entry| {
                 const virt = self.base.?.add(i * mm.KiB(4));
-                func(virt, entry, PageKind.Page4K);
+                context.walk(virt, entry, PageKind.Page4K);
             }
 
             if (i == PT.MaxIndex) {
@@ -164,6 +164,14 @@ pub const PageKind = enum {
     Page4K,
     Page2M,
     Page1G,
+
+    pub fn size(self: @This()) usize {
+        return switch (self) {
+            .Page4K => mm.KiB(4),
+            .Page2M => mm.MiB(2),
+            .Page1G => mm.GiB(1),
+        };
+    }
 };
 
 pub const PD = struct {
@@ -245,17 +253,17 @@ pub const PD = struct {
         return .{ .root = pd, .base = base };
     }
 
-    fn walk(self: Self, func: PageTableVisitor) void {
+    fn walk(self: Self, comptime T: type, context: *T) void {
         var i: PD.IdxType = 0;
         while (true) : (i += 1) {
             switch (self.get_entry_kind(i)) {
                 .PageTable => {
                     const entry = self.get_pt(i).?;
-                    entry.walk(func);
+                    entry.walk(T, context);
                 },
                 .Page2M => {
                     const entry = self.get_page_2m(i).?;
-                    func(self.base.?.add(i * mm.MiB(2)), entry, PageKind.Page2M);
+                    context.walk(self.base.?.add(i * mm.MiB(2)), entry, PageKind.Page2M);
                 },
                 else => {},
             }
@@ -317,12 +325,12 @@ pub const PDPT = struct {
         return .{ .root = pdp, .base = base };
     }
 
-    fn walk(self: Self, func: PageTableVisitor) void {
+    fn walk(self: Self, comptime T: type, context: *T) void {
         var i: PDPT.IdxType = 0;
         while (true) : (i += 1) {
             const pd = self.get_pd(i);
             if (pd) |entry| {
-                entry.walk(func);
+                entry.walk(T, context);
             }
 
             if (i == PDPT.MaxIndex) {
@@ -407,25 +415,54 @@ pub const PML4 = struct {
         self.get_table()[idx] = entry;
     }
 
-    fn walk(self: Self, func: PageTableVisitor) void {
+    fn walk(self: Self, comptime T: type, context: *T) void {
         var i: PML4.IdxType = 0;
         while (true) : (i += 1) {
             const pdp = self.get_pdp(i);
             if (pdp) |entry| {
-                entry.walk(func);
+                entry.walk(T, context);
             }
 
             if (i == PML4.MaxIndex) {
                 break;
             }
         }
+        context.done();
     }
 };
 
-const PageTableVisitor = fn (VirtualAddress, PhysicalAddress, PageKind) void;
-fn visitor(virt: VirtualAddress, phys: PhysicalAddress, pk: PageKind) void {
-    logger.log("{} -> {} ({})\n", .{ virt, phys, pk });
-}
+const Dumper = struct {
+    const Mapping = struct {
+        virt: VirtualAddress,
+        phys: PhysicalAddress,
+        size: usize,
+    };
+
+    prev: ?Mapping = null,
+
+    pub fn walk(self: *@This(), virt: VirtualAddress, phys: PhysicalAddress, pk: PageKind) void {
+        if (self.prev == null) {
+            self.prev = Mapping{ .virt = virt, .phys = phys, .size = pk.size() };
+            return;
+        }
+        const prev = self.prev.?;
+        // Check if we can merge mapping
+        const next_virt = prev.virt.add(prev.size);
+        const next_phys = prev.phys.add(prev.size);
+        if (next_virt.eq(virt) and next_phys.eq(phys)) {
+            self.prev.?.size += pk.size();
+            return;
+        }
+        logger.log("{} -> {} (0x{x} bytes)\n", .{ prev.virt, prev.phys, prev.size });
+        self.prev = Mapping{ .virt = virt, .phys = phys, .size = pk.size() };
+    }
+
+    pub fn done(self: @This()) void {
+        if (self.prev) |prev| {
+            logger.log("{} -> {} (0x{x} bytes)\n", .{ prev.virt, prev.phys, prev.size });
+        }
+    }
+};
 
 pub const VirtualMemoryImpl = struct {
     allocator: *mm.FrameAllocator,
@@ -509,7 +546,7 @@ pub const VirtualMemoryImpl = struct {
         }
     }
 
-    pub fn identity_map(
+    pub fn map_memory(
         self: Self,
         where: VirtualAddress,
         what: PhysicalAddress,
@@ -536,85 +573,13 @@ pub const VirtualMemoryImpl = struct {
 
 var kernel_vm_impl: VirtualMemoryImpl = undefined;
 
-const IDENTITY_MAPPING_START = VirtualAddress.new(0xffff800000000000);
+const DIRECT_MAPPING_START = VirtualAddress.new(0xffff800000000000);
 // -2GiB
 const KERNEL_IMAGE_START = VirtualAddress.new(0xffffffff80000000);
 
-fn dump_pt(pt: *const PT) void {
-    logger.log("    PT@{x}:\n", .{pt.root.value});
-
-    var i: PT.IdxType = 0;
-    while (true) : (i += 1) {
-        const page = pt.get_page(i);
-        if (page) |entry| {
-            logger.log("  [{:3}] {x:0>16}\n", .{ i, entry.value });
-        }
-
-        if (i == PT.MaxIndex) {
-            break;
-        }
-    }
-}
-
-fn dump_pd(pd: *const PD) void {
-    const indent = " " ** 4;
-    logger.log(indent ++ "PD@{x}:\n", .{pd.root.value});
-
-    var i: PD.IdxType = 0;
-    while (true) : (i += 1) {
-        switch (pd.get_entry_kind(i)) {
-            .PageTable => {
-                const entry = pd.get_pt(i).?;
-                logger.log(indent ++ "[{:3}] {x:0>16}\n", .{ i, entry.root.value });
-                dump_pt(&entry);
-            },
-            .Page2M => {
-                const entry = pd.get_page_2m(i).?;
-                logger.log(indent ++ "[{:3}] {x} - 2MiB\n", .{ i, entry });
-            },
-            else => {},
-        }
-
-        if (i == PD.MaxIndex) {
-            break;
-        }
-    }
-}
-
-fn dump_pdpt(pdpt: *const PDPT) void {
-    logger.log("  PDPT@{x}:\n", .{pdpt.root.value});
-
-    var i: PDPT.IdxType = 0;
-    while (true) : (i += 1) {
-        const pd = pdpt.get_pd(i);
-        if (pd) |entry| {
-            logger.log("  [{:3}] {x:0>16}\n", .{ i, entry.root.value });
-            dump_pd(&entry);
-        }
-
-        if (i == PDPT.MaxIndex) {
-            break;
-        }
-    }
-}
-
-fn dump_mm() void {
-    const base = PhysicalAddress.new(x86.CR3.read() & mask);
-    const paging = PML4.init(base);
-    logger.log("PML4@{x}:\n", .{base});
-
-    var i: PML4.IdxType = 0;
-    while (true) : (i += 1) {
-        const pdp = paging.get_pdp(i);
-        if (pdp) |entry| {
-            logger.log("[{:3}] {x:0>16}\n", .{ i, entry.root.value });
-            dump_pdpt(&entry);
-        }
-
-        if (i == PML4.MaxIndex) {
-            break;
-        }
-    }
+fn dump_vm_mappings(vm: *mm.VirtualMemory) void {
+    var visitor = Dumper{};
+    vm.vm_impl.pml4.walk(Dumper, &visitor);
 }
 
 fn setup_kernel_vm() !void {
@@ -624,8 +589,8 @@ fn setup_kernel_vm() !void {
     // Initial 1GiB mapping
     logger.log("Identity mapping 1GiB from 0 phys\n", .{});
     const initial_mapping_size = mm.GiB(1);
-    try kernel_vm_impl.identity_map(
-        IDENTITY_MAPPING_START,
+    try kernel_vm_impl.map_memory(
+        DIRECT_MAPPING_START,
         PhysicalAddress.new(0x0),
         initial_mapping_size,
     );
@@ -643,24 +608,26 @@ fn setup_kernel_vm() !void {
         @panic("Failed to remap kernel");
     };
 
-    identityMapping().virt_start = IDENTITY_MAPPING_START;
-    identityMapping().size = initial_mapping_size;
-
-    // switch to new virtual memory
+    logger.log("Switching to new virtual memory\n", .{});
     mm.kernel_vm.switch_to();
     logger.log("Survived switching to kernel VM\n", .{});
 
+    // switch to new virtual memory
+    identityMapping().virt_start = DIRECT_MAPPING_START;
+    identityMapping().size = initial_mapping_size;
+
+    dump_vm_mappings(&mm.kernel_vm);
+
     logger.log("Mapping rest of identity\n", .{});
-    try kernel_vm_impl.identity_map(
-        IDENTITY_MAPPING_START.add(initial_mapping_size),
+    try kernel_vm_impl.map_memory(
+        DIRECT_MAPPING_START.add(initial_mapping_size),
         PhysicalAddress.new(0 + initial_mapping_size),
         mm.GiB(63),
     );
 
-    identityMapping().virt_start = IDENTITY_MAPPING_START;
+    identityMapping().virt_start = DIRECT_MAPPING_START;
     identityMapping().size = mm.GiB(64);
-
-    mm.kernel_vm.switch_to();
+    logger.log("VM setup done\n", .{});
 }
 
 pub fn init() void {
@@ -677,8 +644,6 @@ pub fn init() void {
     const adjusted_memory = mm.MemoryRange.from_range(begin, free_memory.get_end());
 
     logger.log("Detected {}MiB of free memory\n", .{adjusted_memory.size / 1024 / 1024});
-
-    //dump_mm();
 
     // Initialize physical memory allocator
     main_allocator = mm.FrameAllocator.new(adjusted_memory);

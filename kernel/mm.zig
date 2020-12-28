@@ -1,12 +1,16 @@
 const std = @import("std");
 const arch = @import("root").arch;
+const kernel = @import("kernel.zig");
+
+const logger = kernel.logger.childOf(@typeName(@This()));
 
 pub fn identityMapping() *IdentityMapping {
     return arch.mm.identityMapping();
 }
 
 pub fn identityTranslate(phys: PhysicalAddress) VirtualAddress {
-    return identityMapping().to_virt(phys);
+    const virt = identityMapping().to_virt(phys);
+    return virt;
 }
 
 pub fn frameAllocator() *FrameAllocator {
@@ -58,6 +62,10 @@ pub const VirtualAddress = struct {
         return self.value < other.value;
     }
 
+    pub fn eq(self: @This(), other: VirtualAddress) bool {
+        return self.value == other.value;
+    }
+
     pub fn span(from: VirtualAddress, to: VirtualAddress) usize {
         return to.value - from.value;
     }
@@ -89,6 +97,10 @@ pub const PhysicalAddress = struct {
 
     pub fn sub(self: @This(), val: Type) PhysicalAddress {
         return .{ .value = val + self.value };
+    }
+
+    pub fn eq(self: @This(), other: PhysicalAddress) bool {
+        return self.value == other.value;
     }
 
     pub fn span(from: PhysicalAddress, to: PhysicalAddress) usize {
