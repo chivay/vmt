@@ -19,11 +19,9 @@ pub fn kmain() void {
     arch.init_cpu() catch |err| {
         @panic("Failed to initialize the CPU");
     };
-    logger.log("CPU initialized\n", .{});
 
-    arch.mm.init();
-    arch.x86.acpi.init();
-    arch.x86.pci.init();
+    mm.init();
+    arch.init();
 
     logger.log("Idling...\n", .{});
     arch.enable_interrupts();

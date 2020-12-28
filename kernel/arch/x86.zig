@@ -495,3 +495,8 @@ pub fn init_cpu() !void {
     pic.Master.data_write(0xfd);
     pic.Slave.data_write(0xff);
 }
+
+pub fn init() void {
+    acpi.init();
+    pci.init();
+}
