@@ -72,7 +72,7 @@ pub fn build(b: *Builder) void {
     kernel.setBuildMode(mode);
     kernel.strip = false;
 
-    const arch = Arch.aarch64;
+    const arch = Arch.x86_64;
     buildArch(kernel, arch);
 
     b.default_step.dependOn(&kernel.step);
