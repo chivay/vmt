@@ -8,7 +8,7 @@ pub const mm = @import("mm.zig");
 pub const arch = @import("arch.zig");
 pub const mmio = @import("mmio.zig");
 
-const logger = printk_mod.logger("kernel");
+pub const logger = printk_mod.logger("kernel");
 
 pub fn panic(msg: []const u8, return_trace: ?*builtin.StackTrace) noreturn {
     logger.log("PANIK: {}\n", .{msg});
