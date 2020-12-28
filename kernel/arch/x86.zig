@@ -436,6 +436,10 @@ export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFra
             logger.log("{x}\n", .{frame});
             keyboard_echo();
         },
+        0xe => {
+            logger.log("#GP!\n", .{});
+            hang();
+        },
         else => {
             logger.log("Received unknown interrupt {}\n", .{interrupt_num});
             hang();
