@@ -61,7 +61,7 @@ pub const InterruptDescriptorTable = packed struct {
     }
 
     pub fn load(self: Self) void {
-        const init = packed struct {
+        const descriptor = packed struct {
             size: u16,
             base: u64,
         }{
@@ -69,7 +69,7 @@ pub const InterruptDescriptorTable = packed struct {
             .size = @sizeOf(@TypeOf(self.entries)) - 1,
         };
 
-        lidt(@ptrToInt(&init));
+        lidt(@ptrToInt(&descriptor));
     }
 };
 
@@ -187,7 +187,7 @@ pub fn GlobalDescriptorTable(n: u16) type {
         }
 
         pub fn load(self: Self) void {
-            const init = packed struct {
+            const descriptor = packed struct {
                 size: u16,
                 base: u64,
             }{
@@ -195,7 +195,7 @@ pub fn GlobalDescriptorTable(n: u16) type {
                 .size = @sizeOf(@TypeOf(self.entries)) - 1,
             };
 
-            lgdt(@ptrToInt(&init));
+            lgdt(@ptrToInt(&descriptor));
         }
 
         pub fn reload_cs(self: Self, selector: SegmentSelector) void {
