@@ -265,17 +265,10 @@ const Node = kernel.printk_mod.SinkNode;
 var vga_node = Node{ .data = format_to_vga };
 var serial_node = Node{ .data = format_to_com1 };
 
-var kernel_image: *std.elf.Elf64_Ehdr = undefined;
-
 extern var KERNEL_BASE: [*]align(0x1000) u8;
 extern var KERNEL_VIRT_BASE: *align(0x1000) u8;
 
-fn parse_kernel_image() void {
-    const elf_hdr = kernel.mm.PhysicalAddress.new(@ptrToInt(&KERNEL_BASE));
-    kernel_image = mm.identityMapping().to_virt(elf_hdr).into_pointer(*std.elf.Elf64_Ehdr);
-}
-
-var stack: [16 * 0x1000]u8 align(0x10) = undefined;
+var stack: [2 * 0x1000]u8 align(0x10) = undefined;
 
 export fn multiboot_entry(mb_info: u32) callconv(.C) noreturn {
     @call(.{ .stack = stack[0..] }, mb_entry, .{mb_info});
@@ -295,8 +288,6 @@ fn mb_entry(mb_info: u32) callconv(.C) noreturn {
     const mb = mm.identityMapping().to_virt(mb_phys);
     const info = mb.into_pointer(*multiboot.Info);
     multiboot.info_pointer = info;
-
-    parse_kernel_image();
 
     logger.log("CR3: 0x{x}\n", .{CR3.read()});
     logger.log("CPU Vendor: {}\n", .{get_vendor_string()});
