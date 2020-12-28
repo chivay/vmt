@@ -2,6 +2,7 @@ comptime {
     asm (
         \\.type __cpuid @function;
         \\__cpuid:
+        \\  push %rbx
         \\  mov %esi, %eax
         \\  mov %edx, %ecx
         \\  cpuid
@@ -9,6 +10,7 @@ comptime {
         \\  mov %ebx, 4(%rdi)
         \\  mov %ecx, 8(%rdi)
         \\  mov %edx, 12(%rdi)
+        \\  pop %rbx
         \\  retq
     );
 }
