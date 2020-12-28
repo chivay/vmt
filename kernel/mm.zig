@@ -190,6 +190,49 @@ pub const VirtualMemory = struct {
     }
 };
 
+pub const MemoryAllocator = struct {
+    frame_allocator: *FrameAllocator,
+    freelist: std.SinglyLinkedList(void),
+    main_chunk: ?[]align(0x10) u8,
+
+    const Self = @This();
+    const max_alloc = 0x1000;
+
+    pub fn new(frame_allocator: *FrameAllocator) MemoryAllocator {
+        return .{
+            .frame_allocator = frame_allocator,
+            .freelist = std.SinglyLinkedList(void){ .first = null },
+            .main_chunk = null,
+        };
+    }
+
+    pub fn alloc_bytes(self: *Self, size: usize) ![]align(0x10) u8 {
+        if (self.main_chunk == null or self.main_chunk.?.len < size) {
+            const frame = (try self.frame_allocator.alloc_frame());
+            const virt = identityTranslate(frame);
+
+            var main_chunk: []align(0x10) u8 = undefined;
+            main_chunk.ptr = virt.into_pointer([*]align(0x10) u8);
+            main_chunk.len = 0x1000;
+            self.main_chunk = main_chunk;
+        }
+
+        if (size <= self.main_chunk.?.len) {
+            var result = self.main_chunk.?[0..size];
+            var rest = self.main_chunk.?[size..];
+            self.main_chunk = rest;
+            return result;
+        }
+        return error{OutOfMemory}.OutOfMemory;
+    }
+
+    pub fn alloc(self: *Self, comptime T: type) !*T {
+        const buffer = try self.alloc_bytes(@sizeOf(T));
+        return @ptrCast(*T, buffer);
+    }
+    pub fn free(chunk: *u8) void {}
+};
+
 pub const FrameAllocator = struct {
     // next physical address to allocate
     next_free: PhysicalAddress,
@@ -281,6 +324,13 @@ pub const MemoryRange = struct {
     }
 };
 
+var memory_allocator: MemoryAllocator = undefined;
+
+pub fn memoryAllocator() *MemoryAllocator {
+    return &memory_allocator;
+}
+
 pub fn init() void {
     arch.mm.init();
+    memory_allocator = MemoryAllocator.new(frameAllocator());
 }
