@@ -39,9 +39,7 @@ pub fn kmain() void {
     mm.init();
     arch.init();
 
-    var taskA = Task.create(
-        worker,
-    ) catch |err| {
+    var taskA = Task.create(worker) catch |err| {
         @panic("Failed to allocate a task");
     };
     var taskB = Task.create(worker2) catch |err| {
@@ -52,5 +50,7 @@ pub fn kmain() void {
     scheduler.addTask(taskA);
     scheduler.addTask(taskB);
 
-    scheduler.yield();
+    while (true) {
+        scheduler.yield();
+    }
 }

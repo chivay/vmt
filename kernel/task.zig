@@ -19,24 +19,24 @@ pub const Task = struct {
 };
 
 pub fn switch_task(from: *Task, to: *Task) void {
-    current_task = to;
     arch.x86.asm_switch_task(&from.regs, &to.regs);
 }
 
-var init_task: Task = undefined;
+var init_task: Task = std.mem.zeroes(Task);
 var current_task: *Task = &init_task;
 
 pub const Scheduler = struct {
     task_list: std.TailQueue(void),
 
-    pub fn addTask(self: *@This(), task: *Task) void {
-        self.task_list.prepend(&task.next);
+    const Self = @This();
+
+    pub fn addTask(self: *Self, task: *Task) void {
+        self.task_list.append(&task.next);
     }
 
-    pub fn reschedule(self: *@This()) *Task {
+    pub fn reschedule(self: *Self) *Task {
         if (self.task_list.popFirst()) |node| {
             var task: *Task = @fieldParentPtr(Task, "next", node);
-            self.task_list.append(&task.next);
             return task;
         }
         @panic("Nothing to schedule!");
@@ -44,7 +44,10 @@ pub const Scheduler = struct {
 
     pub fn yield(self: *@This()) void {
         const next_task: *Task = self.reschedule();
-        switch_task(current_task, next_task);
+        self.addTask(current_task);
+        const prev_task = current_task;
+        current_task = next_task;
+        switch_task(prev_task, next_task);
     }
 };
 
