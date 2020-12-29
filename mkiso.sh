@@ -2,7 +2,7 @@
 set -e
 zig build
 
-BUILD_DIR=build
+BUILD_DIR=build/x86_64
 
 TMPDIR=$(mktemp -d)
 

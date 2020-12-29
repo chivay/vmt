@@ -1,3 +1,5 @@
+const x86 = @import("root").arch.x86;
+
 comptime {
     asm (
         \\.type __cpuid @function;
@@ -185,5 +187,34 @@ pub inline fn wrmsr(which: u32, value: u64) void {
         :
         : [high] "{edx}" (value >> 32),
           [low] "{eax}" (@as(u32, value))
+    );
+}
+
+// This subsection discusses usage of each register. Registers %rbp, %rbx and
+// %r12 through %r15 “belong” to the calling function and the called function is
+// required to preserve their values
+pub extern fn asm_switch_task(from: *x86.TaskRegs, to: *x86.TaskRegs) callconv(.C) void;
+comptime {
+    asm (
+        \\.type asm_switch_task @function;
+        \\asm_switch_task:
+        \\  # Save registers
+        \\  push %rbp
+        \\  push %rbx
+        \\  push %r12
+        \\  push %r13
+        \\  push %r14
+        \\  push %r15
+        \\  # Switch stack
+        \\  mov %rsp, 0(%rdi)
+        \\  mov 0(%rsi), %rsp
+        \\  # Restore registers
+        \\  pop %r15
+        \\  pop %r14
+        \\  pop %r13
+        \\  pop %r12
+        \\  pop %rbx
+        \\  pop %rbp
+        \\  retq
     );
 }

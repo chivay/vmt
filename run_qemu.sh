@@ -10,4 +10,6 @@ qemu-system-x86_64 -cdrom kernel.iso \
                    -display $DISP \
                    -enable-kvm \
                    -s \
+                   -m 1G \
+                   -M q35 \
                    $2
