@@ -22,6 +22,21 @@ var main_gdt align(64) = GDT.new();
 var main_tss align(64) = std.mem.zeroes(TSS);
 var main_idt align(64) = std.mem.zeroes(IDT);
 
+pub const TaskRegs = packed struct {
+    // Layout must be kept in sync with asm_switch_stack
+    rsp: u64,
+
+    pub fn setup(func: fn () noreturn, thread_stack: []u8) TaskRegs {
+        // 7 == #saved registers + return address
+        const reg_area_size = @sizeOf(u64) * 7;
+        var reg_area = thread_stack[thread_stack.len - reg_area_size ..];
+        var rip_area = reg_area[6 * @sizeOf(u64) ..];
+        std.mem.set(u8, reg_area, 0);
+        std.mem.writeIntNative(u64, @ptrCast(*[8]u8, rip_area), @ptrToInt(func));
+        return TaskRegs{ .rsp = @ptrToInt(reg_area.ptr) };
+    }
+};
+
 pub const InterruptDescriptorTable = packed struct {
     entries: [256]Entry,
 
