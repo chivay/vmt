@@ -17,6 +17,10 @@ pub fn panic(msg: []const u8, return_trace: ?*builtin.StackTrace) noreturn {
     arch.hang();
 }
 
+pub fn getCoreBlock() *arch.CoreBlock {
+    return arch.getCoreBlock();
+}
+
 pub fn worker() noreturn {
     while (true) {
         logger.log("Hello from worker!\n", .{});

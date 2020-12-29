@@ -186,7 +186,8 @@ pub inline fn wrmsr(which: u32, value: u64) void {
     return asm volatile ("wrmsr"
         :
         : [high] "{edx}" (value >> 32),
-          [low] "{eax}" (@as(u32, value))
+          [low] "{eax}" (@truncate(u32, value)),
+          [which] "{ecx}" (which)
     );
 }
 

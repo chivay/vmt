@@ -348,6 +348,29 @@ fn has_error_code(vector: u16) bool {
 
 pub const IntHandler = fn (u8, u64, *InterruptFrame) callconv(.C) void;
 
+pub const CoreBlock = struct {
+    current_task: *kernel.task.Task,
+};
+
+var initial_core_block: CoreBlock = CoreBlock{
+    .current_task = &kernel.task.init_task,
+};
+
+pub const GSStruct = packed struct {
+    cb: *CoreBlock,
+};
+
+var boot_cpu_gsstruct: GSStruct = GSStruct{
+    .cb = &initial_core_block,
+};
+
+pub fn getCoreBlock() *CoreBlock {
+    const blockptr = asm volatile ("mov %%gs:0x0,%[ret]"
+        : [ret] "={rax}" (-> u64)
+    );
+    return @intToPtr(*CoreBlock, blockptr);
+}
+
 /// Generate stub for n-th exception
 fn exception_stub(comptime n: u8) InterruptStub {
     // Have to bump this, otherwise compilation fails
@@ -504,6 +527,8 @@ pub fn init_cpu() !void {
     }
 
     main_idt.load();
+
+    GSBASE.write(@ptrToInt(&boot_cpu_gsstruct));
 
     pic.remap(0x30, 0x38);
     // enable only keyboard interrupt

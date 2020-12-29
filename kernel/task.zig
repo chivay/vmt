@@ -22,8 +22,7 @@ pub fn switch_task(from: *Task, to: *Task) void {
     arch.x86.asm_switch_task(&from.regs, &to.regs);
 }
 
-var init_task: Task = std.mem.zeroes(Task);
-var current_task: *Task = &init_task;
+pub var init_task: Task = std.mem.zeroes(Task);
 
 pub const Scheduler = struct {
     task_list: std.TailQueue(void),
@@ -44,9 +43,12 @@ pub const Scheduler = struct {
 
     pub fn yield(self: *@This()) void {
         const next_task: *Task = self.reschedule();
-        self.addTask(current_task);
-        const prev_task = current_task;
-        current_task = next_task;
+        const core_block = kernel.getCoreBlock();
+
+        const prev_task = core_block.current_task;
+        core_block.current_task = next_task;
+
+        self.addTask(core_block.current_task);
         switch_task(prev_task, next_task);
     }
 };
