@@ -29,7 +29,10 @@ fn enumerate_pci_devices() void {
                 const vendor_id = mmio_read(u16, conf_base.add(0));
                 const device_id = mmio_read(u16, conf_base.add(2));
                 if (vendor_id != 0xffff) {
-                    logger.log("{x:0>2}.{x:0>2}.{} Device {x}:{x}\n", .{ bus, device, function, vendor_id, device_id });
+                    logger.log(
+                        "{x:0>2}.{x:0>2}.{} Device {x}:{x}\n",
+                        .{ bus, device, function, vendor_id, device_id },
+                    );
                 }
 
                 if (function == 7) break;
