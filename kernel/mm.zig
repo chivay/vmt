@@ -4,12 +4,12 @@ const kernel = @import("kernel.zig");
 
 const logger = kernel.logger.childOf(@typeName(@This()));
 
-pub fn identityMapping() *IdentityMapping {
-    return arch.mm.identityMapping();
+pub fn directMapping() *DirectMapping {
+    return arch.mm.directMapping();
 }
 
-pub fn identityTranslate(phys: PhysicalAddress) VirtualAddress {
-    const virt = identityMapping().to_virt(phys);
+pub fn directTranslate(phys: PhysicalAddress) VirtualAddress {
+    const virt = directMapping().to_virt(phys);
     return virt;
 }
 
@@ -138,12 +138,12 @@ pub const PhysicalAddress = struct {
     }
 };
 
-pub const IdentityMapping = struct {
+pub const DirectMapping = struct {
     /// Simple mapping from boot time
     virt_start: VirtualAddress,
     size: usize,
 
-    pub fn init(start: VirtualAddress, size: usize) IdentityMapping {
+    pub fn init(start: VirtualAddress, size: usize) DirectMapping {
         return .{
             .virt_start = start,
             .size = size,
@@ -209,7 +209,7 @@ pub const MemoryAllocator = struct {
     pub fn alloc_bytes(self: *Self, size: usize) ![]align(0x10) u8 {
         if (self.main_chunk == null or self.main_chunk.?.len < size) {
             const frame = (try self.frame_allocator.alloc_frame());
-            const virt = identityTranslate(frame);
+            const virt = directTranslate(frame);
 
             var main_chunk: []align(0x10) u8 = undefined;
             main_chunk.ptr = virt.into_pointer([*]align(0x10) u8);
@@ -255,7 +255,7 @@ pub const FrameAllocator = struct {
 
     pub fn alloc_zero_frame(self: *Self) !PhysicalAddress {
         const frame = try self.alloc_frame();
-        const buf = identityMapping().to_virt(frame).into_pointer(*[PAGE_SIZE]u8);
+        const buf = directMapping().to_virt(frame).into_pointer(*[PAGE_SIZE]u8);
         std.mem.set(u8, buf, 0);
 
         return frame;
@@ -263,7 +263,7 @@ pub const FrameAllocator = struct {
 
     pub fn alloc_zero_aligned(self: *Self, alignment: usize, n: usize) !PhysicalAddress {
         const frame = try self.alloc_aligned(alignment, n);
-        const buf = identityMapping().to_virt(frame).into_pointer([*]u8);
+        const buf = directMapping().to_virt(frame).into_pointer([*]u8);
         std.mem.set(u8, buf[0..(n * PAGE_SIZE)], 0);
 
         return frame;
@@ -282,7 +282,7 @@ pub const FrameAllocator = struct {
         // Try allocating from freelist
         if (self.freelist.popFirst()) |node| {
             const virt_addr = VirtualAddress.new(@ptrToInt(node));
-            const phys_addr = identityMapping().to_phys(virt_addr);
+            const phys_addr = directMapping().to_phys(virt_addr);
             return phys_addr;
         }
         // No free pages in list
@@ -303,7 +303,7 @@ pub const FrameAllocator = struct {
 
     pub fn free_frame(self: *Self, addr: PhysicalAddress) void {
         std.debug.assert(std.mem.isAligned(addr.value, PAGE_SIZE));
-        const virt_addr = identityMapping().to_virt(addr);
+        const virt_addr = directMapping().to_virt(addr);
         const node = virt_addr.into_pointer(*@TypeOf(self.freelist).Node);
         self.freelist.prepend(node);
     }

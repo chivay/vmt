@@ -17,10 +17,10 @@ pub fn get_kernel_end() mm.VirtualAddress {
     return mm.VirtualAddress.new(@ptrToInt(&kernel_end));
 }
 
-var identity_mapping: mm.IdentityMapping = undefined;
+var direct_mapping: mm.DirectMapping = undefined;
 
-pub fn identityMapping() *mm.IdentityMapping {
-    return &identity_mapping;
+pub fn directMapping() *mm.DirectMapping {
+    return &direct_mapping;
 }
 
 var kernel_vm: mm.VirtualMemory = undefined;
@@ -64,7 +64,7 @@ fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?mm.MemoryRange {
 
     logger.log("BIOS memory map:\n", .{});
     while (offset.lt(mmap_end)) {
-        const entry = x86.mm.identityMapping().to_virt(offset).into_pointer(*MemEntry);
+        const entry = x86.mm.directMapping().to_virt(offset).into_pointer(*MemEntry);
 
         const start = entry.base_addr;
         const end = start + entry.length - 1;
@@ -100,7 +100,7 @@ const mask: u64 = ~@as(u64, 0xfff);
 pub const PT = struct {
     root: PhysicalAddress,
     base: ?VirtualAddress,
-    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.identityTranslate,
+    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.directTranslate,
 
     const EntryType = u64;
     const IdxType = u9;
@@ -177,7 +177,7 @@ pub const PageKind = enum {
 pub const PD = struct {
     root: PhysicalAddress,
     base: ?VirtualAddress,
-    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.identityTranslate,
+    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.directTranslate,
 
     const EntryType = u64;
     const IdxType = u9;
@@ -278,7 +278,7 @@ pub const PD = struct {
 pub const PDPT = struct {
     root: PhysicalAddress,
     base: ?VirtualAddress,
-    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.identityTranslate,
+    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.directTranslate,
 
     const IdxType = u9;
     const EntryType = u64;
@@ -356,7 +356,7 @@ pub const PML4 = struct {
     root: PhysicalAddress,
     // Missing base implies 4 level paging scheme
     base: ?VirtualAddress,
-    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.identityTranslate,
+    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.directTranslate,
 
     const IdxType = u9;
     const EntryType = u64;
@@ -565,7 +565,7 @@ pub const VirtualMemoryImpl = struct {
                 unit,
             ) catch |err| {
                 logger.log("{}\n", .{err});
-                @panic("Failed to setup identity mapping");
+                @panic("Failed to setup direct mapping");
             };
         }
     }
@@ -613,20 +613,20 @@ fn setup_kernel_vm() !void {
     logger.log("Survived switching to kernel VM\n", .{});
 
     // switch to new virtual memory
-    identityMapping().virt_start = DIRECT_MAPPING_START;
-    identityMapping().size = initial_mapping_size;
+    directMapping().virt_start = DIRECT_MAPPING_START;
+    directMapping().size = initial_mapping_size;
 
     dump_vm_mappings(&mm.kernel_vm);
 
-    logger.log("Mapping rest of identity\n", .{});
+    logger.log("Mapping rest of direct memory\n", .{});
     try kernel_vm_impl.map_memory(
         DIRECT_MAPPING_START.add(initial_mapping_size),
         PhysicalAddress.new(0 + initial_mapping_size),
         mm.GiB(63),
     );
 
-    identityMapping().virt_start = DIRECT_MAPPING_START;
-    identityMapping().size = mm.GiB(64);
+    directMapping().virt_start = DIRECT_MAPPING_START;
+    directMapping().size = mm.GiB(64);
     logger.log("VM setup done\n", .{});
 }
 
@@ -638,7 +638,7 @@ pub fn init() void {
     var free_memory = mem.?;
 
     // Ensure we don't overwrite kernel
-    const kend = x86.mm.identityMapping().to_phys(x86.mm.get_kernel_end());
+    const kend = x86.mm.directMapping().to_phys(x86.mm.get_kernel_end());
     // Move beginning to after kernel
     const begin = kend.max(free_memory.base);
     const adjusted_memory = mm.MemoryRange.from_range(begin, free_memory.get_end());

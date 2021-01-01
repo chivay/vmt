@@ -156,7 +156,7 @@ fn find_rsdp() ?*RSDP {
     // Use correct method (?)
     while (base.lt(limit)) : (base = base.add(16)) {
         //logger.log("Searching... {}", .{base});
-        const candidate = mm.identityMapping().to_virt(base).into_pointer(*RSDP);
+        const candidate = mm.directMapping().to_virt(base).into_pointer(*RSDP);
         if (candidate.signature_ok()) {
             if (candidate.checksum_ok()) {
                 return candidate;
@@ -298,7 +298,7 @@ fn parse_hpet(header: *SDTHeader) void {
 }
 
 pub fn parse_table(addr: PhysicalAddress) void {
-    const header = mm.identityMapping().to_virt(addr).into_pointer(*SDTHeader);
+    const header = mm.directMapping().to_virt(addr).into_pointer(*SDTHeader);
     if (std.mem.eql(u8, header.signature[0..], "FACP")) {
         parse_fadt(header);
     } else if (std.mem.eql(u8, header.signature[0..], "MCFG")) {
@@ -336,6 +336,6 @@ pub fn init() void {
         return;
     }
     logger.log("Valid RSDP found\n", .{});
-    const rsdt = mm.identityMapping().to_virt(rsdp.?.get_rsdt()).into_pointer(*SDTHeader);
+    const rsdt = mm.directMapping().to_virt(rsdp.?.get_rsdt()).into_pointer(*SDTHeader);
     parse_rsdt(rsdt);
 }

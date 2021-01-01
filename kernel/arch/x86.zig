@@ -297,11 +297,11 @@ fn mb_entry(mb_info: u32) callconv(.C) noreturn {
     // setup identity mapping
     const VIRT_START = kernel.mm.VirtualAddress.new(@ptrToInt(&KERNEL_VIRT_BASE));
     const SIZE = kernel.mm.MiB(16);
-    mm.identityMapping().* = kernel.mm.IdentityMapping.init(VIRT_START, SIZE);
+    mm.directMapping().* = kernel.mm.DirectMapping.init(VIRT_START, SIZE);
 
     // Initialize multiboot info pointer
     const mb_phys = kernel.mm.PhysicalAddress.new(mb_info);
-    const mb = mm.identityMapping().to_virt(mb_phys);
+    const mb = mm.directMapping().to_virt(mb_phys);
     const info = mb.into_pointer(*multiboot.Info);
     multiboot.info_pointer = info;
 
