@@ -245,7 +245,7 @@ pub const FrameAllocator = struct {
 
     const OutOfMemory = error.OutOfMemory;
 
-    pub fn new(memory: MemoryRange) FrameAllocator {
+    pub fn new(memory: PhysicalMemoryRange) FrameAllocator {
         return .{
             .next_free = memory.base.alignForward(PAGE_SIZE),
             .limit = memory.get_end(),
@@ -309,20 +309,30 @@ pub const FrameAllocator = struct {
     }
 };
 
-pub const MemoryRange = struct {
-    base: PhysicalAddress,
-    size: u64,
+pub const PhysicalMemoryRange = MemoryRange(PhysicalAddress);
+pub const VirtualMemoryRange = MemoryRange(VirtualAddress);
 
-    pub fn get_end(self: @This()) PhysicalAddress {
-        return self.base.add(self.size);
-    }
+pub fn MemoryRange(comptime T: type) type {
+    return struct {
+        const Self = @This();
+        base: T,
+        size: usize,
 
-    pub fn from_range(start: PhysicalAddress, end: PhysicalAddress) MemoryRange {
-        std.debug.assert(start.lt(end));
-        const size = PhysicalAddress.span(start, end);
-        return .{ .base = start, .size = size };
-    }
-};
+        pub fn sized(base: T, size: usize) Self {
+            return .{ .base = base, .size = size };
+        }
+
+        pub fn get_end(self: Self) T {
+            return self.base.add(self.size);
+        }
+
+        pub fn from_range(start: T, end: T) Self {
+            std.debug.assert(start.lt(end));
+            const size = T.span(start, end);
+            return .{ .base = start, .size = size };
+        }
+    };
+}
 
 var memory_allocator: MemoryAllocator = undefined;
 

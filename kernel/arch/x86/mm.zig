@@ -6,10 +6,25 @@ const x86 = @import("../x86.zig");
 const PhysicalAddress = mm.PhysicalAddress;
 const VirtualAddress = mm.VirtualAddress;
 
-const logger = x86.logger.childOf(@typeName(@This()));
-
 pub const VirtAddrType = u64;
 pub const PhysAddrType = u64;
+
+const logger = x86.logger.childOf(@typeName(@This()));
+
+const KERNEL_MEMORY_MAP = [_]mm.VirtualMemoryRange{
+    DIRECT_MAPPING,
+    KERNEL_IMAGE,
+};
+
+const DIRECT_MAPPING = mm.VirtualMemoryRange.sized(
+    VirtualAddress.new(0xffff800000000000),
+    mm.GiB(64),
+);
+
+const KERNEL_IMAGE = mm.VirtualMemoryRange.sized(
+    VirtualAddress.new(0xffffffff80000000),
+    mm.GiB(1),
+);
 
 pub extern var kernel_end: [*]u8;
 
@@ -18,20 +33,18 @@ pub fn get_kernel_end() mm.VirtualAddress {
 }
 
 var direct_mapping: mm.DirectMapping = undefined;
-
 pub fn directMapping() *mm.DirectMapping {
     return &direct_mapping;
 }
 
-var kernel_vm: mm.VirtualMemory = undefined;
-
 var main_allocator: mm.FrameAllocator = undefined;
-
 pub fn frameAllocator() *mm.FrameAllocator {
     return &main_allocator;
 }
 
-pub fn detect_memory() ?mm.MemoryRange {
+var kernel_vm: mm.VirtualMemory = undefined;
+
+pub fn detect_memory() ?mm.PhysicalMemoryRange {
     if (x86.multiboot.info_pointer) |mbinfo| {
         return detect_multiboot_memory(mbinfo);
     }
@@ -43,7 +56,7 @@ fn bit_set(value: anytype, comptime bit: BitStruct) bool {
     return (value & (1 << bit.shift)) != 0;
 }
 
-fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?mm.MemoryRange {
+fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?mm.PhysicalMemoryRange {
     if (!bit_set(mb_info.flags, BIT(6))) {
         @panic("Missing memory map!");
     }
@@ -57,7 +70,7 @@ fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?mm.MemoryRange {
         type_: u32,
     };
 
-    var best_slot: ?mm.MemoryRange = null;
+    var best_slot: ?mm.PhysicalMemoryRange = null;
 
     var offset = mm.PhysicalAddress.new(mb_info.mmap_addr);
     const mmap_end = mm.PhysicalAddress.new(mb_info.mmap_addr + mb_info.mmap_length);
@@ -81,7 +94,10 @@ fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?mm.MemoryRange {
         if (entry.type_ != 1) {
             continue;
         }
-        const this_slot = mm.MemoryRange{ .base = mm.PhysicalAddress.new(start), .size = entry.length };
+        const this_slot = mm.PhysicalMemoryRange{
+            .base = PhysicalAddress.new(start),
+            .size = entry.length,
+        };
 
         if (best_slot) |slot| {
             if (this_slot.size > slot.size) {
@@ -573,9 +589,7 @@ pub const VirtualMemoryImpl = struct {
 
 var kernel_vm_impl: VirtualMemoryImpl = undefined;
 
-const DIRECT_MAPPING_START = VirtualAddress.new(0xffff800000000000);
 // -2GiB
-const KERNEL_IMAGE_START = VirtualAddress.new(0xffffffff80000000);
 
 fn dump_vm_mappings(vm: *mm.VirtualMemory) void {
     var visitor = Dumper{};
@@ -590,7 +604,7 @@ fn setup_kernel_vm() !void {
     logger.log("Identity mapping 1GiB from 0 phys\n", .{});
     const initial_mapping_size = mm.GiB(1);
     try kernel_vm_impl.map_memory(
-        DIRECT_MAPPING_START,
+        DIRECT_MAPPING.base,
         PhysicalAddress.new(0x0),
         initial_mapping_size,
     );
@@ -598,9 +612,9 @@ fn setup_kernel_vm() !void {
     // Map kernel image
     logger.log("Mapping kernel image\n", .{});
     const kern_end = VirtualAddress.new(@ptrToInt(&kernel_end));
-    const kernel_size = VirtualAddress.span(KERNEL_IMAGE_START, kern_end);
+    const kernel_size = VirtualAddress.span(KERNEL_IMAGE.base, kern_end);
     mm.kernel_vm.map_addr(
-        KERNEL_IMAGE_START,
+        KERNEL_IMAGE.base,
         PhysicalAddress.new(0),
         std.mem.alignForward(kernel_size, mm.MiB(2)),
     ) catch |err| {
@@ -613,19 +627,19 @@ fn setup_kernel_vm() !void {
     logger.log("Survived switching to kernel VM\n", .{});
 
     // switch to new virtual memory
-    directMapping().virt_start = DIRECT_MAPPING_START;
+    directMapping().virt_start = DIRECT_MAPPING.base;
     directMapping().size = initial_mapping_size;
 
     dump_vm_mappings(&mm.kernel_vm);
 
     logger.log("Mapping rest of direct memory\n", .{});
     try kernel_vm_impl.map_memory(
-        DIRECT_MAPPING_START.add(initial_mapping_size),
+        DIRECT_MAPPING.base.add(initial_mapping_size),
         PhysicalAddress.new(0 + initial_mapping_size),
         mm.GiB(63),
     );
 
-    directMapping().virt_start = DIRECT_MAPPING_START;
+    directMapping().virt_start = DIRECT_MAPPING.base;
     directMapping().size = mm.GiB(64);
     logger.log("VM setup done\n", .{});
 }
@@ -641,7 +655,7 @@ pub fn init() void {
     const kend = x86.mm.directMapping().to_phys(x86.mm.get_kernel_end());
     // Move beginning to after kernel
     const begin = kend.max(free_memory.base);
-    const adjusted_memory = mm.MemoryRange.from_range(begin, free_memory.get_end());
+    const adjusted_memory = mm.PhysicalMemoryRange.from_range(begin, free_memory.get_end());
 
     logger.log("Detected {}MiB of free memory\n", .{adjusted_memory.size / 1024 / 1024});
 
