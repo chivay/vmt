@@ -13,12 +13,24 @@ const logger = x86.logger.childOf(@typeName(@This()));
 
 const KERNEL_MEMORY_MAP = [_]mm.VirtualMemoryRange{
     DIRECT_MAPPING,
+    DYNAMIC_MAPPING,
     KERNEL_IMAGE,
 };
+
+comptime {
+    // Check for overlaps
+    var slots = KERNEL_MEMORY_MAP.len;
+    var i = 0;
+}
 
 const DIRECT_MAPPING = mm.VirtualMemoryRange.sized(
     VirtualAddress.new(0xffff800000000000),
     mm.GiB(64),
+);
+
+const DYNAMIC_MAPPING = mm.VirtualMemoryRange.sized(
+    VirtualAddress.new(0xffff900000000000),
+    mm.TiB(1),
 );
 
 const KERNEL_IMAGE = mm.VirtualMemoryRange.sized(
@@ -483,8 +495,18 @@ const Dumper = struct {
 pub const VirtualMemoryImpl = struct {
     allocator: *mm.FrameAllocator,
     pml4: PML4,
+    dynamic_next: VirtualAddress,
+    dynamic_end: VirtualAddress,
 
     const Self = @This();
+
+    const MapOptions = struct {
+        writable: bool,
+        user: bool,
+        write_through: bool,
+        cache_disable: bool,
+        no_execute: bool,
+    };
 
     const Error = error{
         InvalidSize,
@@ -498,6 +520,8 @@ pub const VirtualMemoryImpl = struct {
         return VirtualMemoryImpl{
             .allocator = frame_allocator,
             .pml4 = PML4.init(frame, null),
+            .dynamic_next = DYNAMIC_MAPPING.base,
+            .dynamic_end = DYNAMIC_MAPPING.get_end(),
         };
     }
 
@@ -509,6 +533,7 @@ pub const VirtualMemoryImpl = struct {
         self: Self,
         where: VirtualAddress,
         what: PhysicalAddress,
+        options: *const MapOptions,
     ) !void {
         if (!where.isAligned(mm.MiB(2)) or !what.isAligned(mm.MiB(2))) {
             return Error.UnalignedAddress;
@@ -545,7 +570,24 @@ pub const VirtualMemoryImpl = struct {
         if (pd.get_entry_kind(pd_index) != PD.EntryKind.Missing) {
             return Error.MappingExists;
         }
-        pd.set_entry(pd_index, what.value | PD.WRITABLE.v() | PD.PRESENT.v() | PD.PAGE_2M.v());
+        var flags: u64 = 0;
+        if (options.writable) {
+            flags |= PD.WRITABLE.v();
+        }
+
+        if (options.user) {
+            flags |= PD.USER.v();
+        }
+
+        if (options.write_through) {
+            flags |= PD.WRITE_THROUGH.v();
+        }
+
+        if (options.cache_disable) {
+            flags |= PD.CACHE_DISABLE.v();
+        }
+
+        pd.set_entry(pd_index, what.value | flags | PD.PRESENT.v() | PD.PAGE_2M.v());
     }
 
     pub fn map_addr(
@@ -553,13 +595,41 @@ pub const VirtualMemoryImpl = struct {
         where: VirtualAddress,
         what: PhysicalAddress,
         length: usize,
+        options: *const MapOptions,
     ) !void {
         switch (length) {
             mm.KiB(4) => @panic("Unimplemented"),
-            mm.MiB(2) => return self.map_page_2mb(where, what),
+            mm.MiB(2) => return self.map_page_2mb(where, what, options),
             mm.GiB(1) => @panic("Unimplemented"),
             else => return Error.InvalidSize,
         }
+    }
+
+    pub fn map_range(
+        self: Self,
+        where: VirtualAddress,
+        what: PhysicalAddress,
+        size: usize,
+        options: *const MapOptions,
+    ) !mm.VirtualMemoryRange {
+        const unit = mm.MiB(2);
+        var left = std.mem.alignForward(size, unit);
+        var done: usize = 0;
+        while (left != 0) : ({
+            left -= unit;
+            done += unit;
+        }) {
+            self.map_addr(
+                where.add(done),
+                what.add(done),
+                unit,
+                options,
+            ) catch |err| {
+                logger.log("{}\n", .{err});
+                @panic("Failed to setup direct mapping");
+            };
+        }
+        return mm.VirtualMemoryRange{ .base = where, .size = done };
     }
 
     pub fn map_memory(
@@ -567,34 +637,37 @@ pub const VirtualMemoryImpl = struct {
         where: VirtualAddress,
         what: PhysicalAddress,
         size: usize,
-    ) !void {
-        const unit = mm.MiB(2);
-        var left = size;
-        var done: usize = 0;
-        while (left != 0) : ({
-            left -= unit;
-            done += unit;
-        }) {
-            mm.kernel_vm.map_addr(
-                where.add(done),
-                what.add(done),
-                unit,
-            ) catch |err| {
-                logger.log("{}\n", .{err});
-                @panic("Failed to setup direct mapping");
-            };
-        }
+    ) !mm.VirtualMemoryRange {
+        const options = MapOptions{
+            .writable = true,
+            .user = false,
+            .write_through = false,
+            .cache_disable = true,
+            .no_execute = false,
+        };
+        return self.map_range(where, what, size, &options);
+    }
+
+    pub fn map_io(self: *Self, what: PhysicalAddress, size: usize) !mm.VirtualMemoryRange {
+        const options = MapOptions{
+            .writable = true,
+            .user = false,
+            .write_through = false,
+            .cache_disable = true,
+            .no_execute = false,
+        };
+        const range = try self.map_range(self.dynamic_next, what, size, &options);
+        self.dynamic_next = self.dynamic_next.add(range.size);
+        return range;
     }
 };
 
-var kernel_vm_impl: VirtualMemoryImpl = undefined;
-
-// -2GiB
-
-fn dump_vm_mappings(vm: *mm.VirtualMemory) void {
+pub fn dump_vm_mappings(vm: *mm.VirtualMemory) void {
     var visitor = Dumper{};
     vm.vm_impl.pml4.walk(Dumper, &visitor);
 }
+
+var kernel_vm_impl: VirtualMemoryImpl = undefined;
 
 fn setup_kernel_vm() !void {
     // Initialize generic kernel VM
@@ -603,7 +676,7 @@ fn setup_kernel_vm() !void {
     // Initial 1GiB mapping
     logger.log("Identity mapping 1GiB from 0 phys\n", .{});
     const initial_mapping_size = mm.GiB(1);
-    try kernel_vm_impl.map_memory(
+    try mm.kernel_vm.map_memory(
         DIRECT_MAPPING.base,
         PhysicalAddress.new(0x0),
         initial_mapping_size,
@@ -613,7 +686,7 @@ fn setup_kernel_vm() !void {
     logger.log("Mapping kernel image\n", .{});
     const kern_end = VirtualAddress.new(@ptrToInt(&kernel_end));
     const kernel_size = VirtualAddress.span(KERNEL_IMAGE.base, kern_end);
-    mm.kernel_vm.map_addr(
+    mm.kernel_vm.map_memory(
         KERNEL_IMAGE.base,
         PhysicalAddress.new(0),
         std.mem.alignForward(kernel_size, mm.MiB(2)),
@@ -633,7 +706,7 @@ fn setup_kernel_vm() !void {
     dump_vm_mappings(&mm.kernel_vm);
 
     logger.log("Mapping rest of direct memory\n", .{});
-    try kernel_vm_impl.map_memory(
+    try mm.kernel_vm.map_memory(
         DIRECT_MAPPING.base.add(initial_mapping_size),
         PhysicalAddress.new(0 + initial_mapping_size),
         mm.GiB(63),
