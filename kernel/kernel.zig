@@ -13,7 +13,7 @@ const Task = task.Task;
 pub const logger = printk_mod.logger("kernel");
 
 pub fn panic(msg: []const u8, return_trace: ?*builtin.StackTrace) noreturn {
-    logger.log("PANIK: {}\n", .{msg});
+    logger.critical("PANIK: {}\n", .{msg});
     arch.hang();
 }
 

@@ -304,11 +304,11 @@ fn mb_entry(mb_info: u32) callconv(.C) noreturn {
     const info = mb.into_pointer(*multiboot.Info);
     multiboot.info_pointer = info;
 
-    logger.log("CR3: 0x{x}\n", .{CR3.read()});
-    logger.log("CPU Vendor: {}\n", .{get_vendor_string()});
-    logger.log("Kernel end: {x}\n", .{mm.get_kernel_end()});
+    logger.debug("CR3: 0x{x}\n", .{CR3.read()});
+    logger.info("CPU Vendor: {}\n", .{get_vendor_string()});
+    logger.debug("Kernel end: {x}\n", .{mm.get_kernel_end()});
 
-    logger.log("Booting the kernel...\n", .{});
+    logger.info("Booting the kernel...\n", .{});
     kernel.kmain();
 
     hang();
