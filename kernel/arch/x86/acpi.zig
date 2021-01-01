@@ -202,8 +202,100 @@ fn parse_mcfg(header: *SDTHeader) void {
         mcfg_entry = entry;
     }
 }
-fn parse_apic(header: *SDTHeader) void {}
-fn parse_hpet(header: *SDTHeader) void {}
+
+const MADTLapicEntry = packed struct {
+    madt_header: MADTHeader,
+    processor_uid: u8,
+    apic_id: u8,
+    flags: u32,
+};
+
+const MADTEntryType = enum(u8) {
+    LocalApic = 0,
+    IoApic = 1,
+    InterruptSourceOverrride = 2,
+    NmiSource = 3,
+    LocalApicNmi = 4,
+    LocalApicAddressOverride = 5,
+    IoSapic = 6,
+    LocalSapic = 7,
+    PlatformInterruptSources = 8,
+    ProcessorLocalx2Apic = 9,
+    Localx2ApicNmi = 0xa,
+    _,
+};
+
+fn intToEnumSafe(comptime T: type, value: @TagType(T)) ?T {
+    const enumInfo = switch (@typeInfo(T)) {
+        .Enum => |enumInfo| enumInfo,
+        else => @compileError("Invalid type"),
+    };
+
+    comptime if (enumInfo.is_exhaustive) {
+        return @intToEnum(T, value);
+    };
+
+    inline for (enumInfo.fields) |enumField| {
+        if (value == enumField.value) {
+            return @intToEnum(T, value);
+        }
+    }
+    return null;
+}
+
+const MADTInfo = packed struct {
+    lapic_address: u32,
+    // The 8259 vectors must be disabled (that is, masked) when
+    // enabling the ACPI APIC operation.
+    flags: u32,
+};
+
+const MADTHeader = packed struct {
+    entry_type: u8,
+    record_length: u8,
+};
+
+const MADTLapic = packed struct {
+    header: MADTHeader,
+    acpi_processor_uid: u8,
+    apic_uid: u8,
+    flags: u32,
+};
+
+fn parse_apic(header: *SDTHeader) void {
+    logger.log("Parsing MADT\n", .{});
+    //logger.log("{}\n", .{header});
+    const data_length = header.length - @sizeOf(SDTHeader);
+    var data = @intToPtr([*]u8, @ptrToInt(header) + @sizeOf(SDTHeader))[0..data_length];
+
+    var madt_info_slice = data[0..@sizeOf(MADTInfo)];
+
+    const madt_info: *MADTInfo = @ptrCast(*MADTInfo, madt_info_slice);
+    //logger.log("{x}\n", .{madt_info});
+
+    var madt_header: *MADTHeader = undefined;
+    var entry_data = data[@sizeOf(MADTInfo)..];
+    while (entry_data.len >= @sizeOf(MADTHeader)) : ({
+        entry_data = entry_data[madt_header.record_length..];
+    }) {
+        madt_header = @ptrCast(*MADTHeader, entry_data);
+        const typ = intToEnumSafe(MADTEntryType, madt_header.entry_type);
+        if (typ == null) continue;
+        const typ_enum = typ.?;
+        switch (typ_enum) {
+            .LocalApic => {
+                const lapic = @ptrCast(*MADTLapic, entry_data);
+                //logger.log("{}\n", .{lapic});
+            },
+            else => {
+                //logger.log("{}\n", .{typ});
+            },
+        }
+    }
+}
+fn parse_hpet(header: *SDTHeader) void {
+    logger.log("Parsing HPET\n", .{});
+}
 
 pub fn parse_table(addr: PhysicalAddress) void {
     const header = mm.identityMapping().to_virt(addr).into_pointer(*SDTHeader);

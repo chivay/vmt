@@ -12,6 +12,7 @@ pub const mm = @import("x86/mm.zig");
 pub const multiboot = @import("x86/multiboot.zig");
 pub const acpi = @import("x86/acpi.zig");
 pub const pci = @import("x86/pci.zig");
+pub const apic = @import("x86/apic.zig");
 
 pub const logger = kernel.printk_mod.logger("x86");
 
@@ -538,5 +539,6 @@ pub fn init_cpu() !void {
 
 pub fn init() void {
     acpi.init();
+    apic.init();
     pci.init();
 }
