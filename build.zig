@@ -33,6 +33,33 @@ fn build_x86_64(kernel: *std.build.LibExeObjStep) void {
     kernel.setLinkerScriptPath("kernel/arch/x86/linker.ld");
     kernel.addAssemblyFile("kernel/arch/x86/boot.S");
     kernel.setOutputDir("build/x86_64");
+
+    var iso_tls = kernel.builder.step("iso", "Build multiboot ISO");
+
+    var iso = kernel.builder.addSystemCommand(&[_][]const u8{"scripts/mkiso.sh"});
+    iso.addArtifactArg(kernel);
+    iso_tls.dependOn(&iso.step);
+
+    var qemu_tls = kernel.builder.step("qemu", "Run QEMU");
+    var qemu = kernel.builder.addSystemCommand(&[_][]const u8{"qemu-system-x86_64"});
+    qemu.addArgs(&[_][]const u8{
+        "-enable-kvm",
+        "-cdrom",
+        "build/x86_64/kernel.iso",
+        "-serial",
+        "stdio",
+        "-display",
+        "none",
+        "-m",
+        "1G",
+        "-M",
+        "q35",
+    });
+
+    qemu.step.dependOn(&iso.step);
+    qemu_tls.dependOn(&qemu.step);
+
+    kernel.builder.default_step = qemu_tls;
 }
 
 fn build_arm64(kernel: *std.build.LibExeObjStep) void {
