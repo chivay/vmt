@@ -14,4 +14,4 @@ jobs:
       - uses: docker://euantorano/zig:latest
         with:
           entrypoint: zig
-          args: build
+          args: build install
