@@ -33,6 +33,44 @@ pub fn TiB(comptime bytes: u64) u64 {
     return GiB(bytes) * 1024;
 }
 
+const Dumper = struct {
+    const Mapping = struct {
+        virt: VirtualAddress,
+        phys: PhysicalAddress,
+        size: usize,
+    };
+
+    prev: ?Mapping = null,
+
+    pub fn walk(self: *@This(), virt: VirtualAddress, phys: PhysicalAddress, page_size: usize) void {
+        if (self.prev == null) {
+            self.prev = Mapping{ .virt = virt, .phys = phys, .size = page_size };
+            return;
+        }
+        const prev = self.prev.?;
+        // Check if we can merge mapping
+        const next_virt = prev.virt.add(prev.size);
+        const next_phys = prev.phys.add(prev.size);
+        if (next_virt.eq(virt) and next_phys.eq(phys)) {
+            self.prev.?.size += page_size;
+            return;
+        }
+        logger.log("{} -> {} (0x{x} bytes)\n", .{ prev.virt, prev.phys, prev.size });
+        self.prev = Mapping{ .virt = virt, .phys = phys, .size = page_size };
+    }
+
+    pub fn done(self: @This()) void {
+        if (self.prev) |prev| {
+            logger.log("{} -> {} (0x{x} bytes)\n", .{ prev.virt, prev.phys, prev.size });
+        }
+    }
+};
+
+pub fn dump_vm_mappings(vm: *VirtualMemory) void {
+    var visitor = Dumper{};
+    vm.vm_impl.walk(Dumper, &visitor);
+}
+
 pub const VirtualAddress = struct {
     const Type = arch.mm.VirtAddrType;
 

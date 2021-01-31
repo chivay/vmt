@@ -6,8 +6,13 @@ const x86 = @import("../x86.zig");
 const PhysicalAddress = mm.PhysicalAddress;
 const VirtualAddress = mm.VirtualAddress;
 
+usingnamespace @import("paging.zig");
+
 pub const VirtAddrType = u64;
 pub const PhysAddrType = u64;
+
+const BIT = kernel.BIT;
+const bit_set = kernel.bit_set;
 
 const logger = x86.logger.childOf(@typeName(@This()));
 
@@ -62,10 +67,6 @@ pub fn detect_memory() ?mm.PhysicalMemoryRange {
     }
 
     return null;
-}
-
-fn bit_set(value: anytype, comptime bit: BitStruct) bool {
-    return (value & (1 << bit.shift)) != 0;
 }
 
 fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?mm.PhysicalMemoryRange {
@@ -123,375 +124,6 @@ fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?mm.PhysicalMemoryRange
     return best_slot;
 }
 
-const mask: u64 = ~@as(u64, 0xfff);
-
-pub const PT = struct {
-    root: PhysicalAddress,
-    base: ?VirtualAddress,
-    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.directTranslate,
-
-    const EntryType = u64;
-    const IdxType = u9;
-    const MaxIndex = std.math.maxInt(IdxType);
-    const TableFormat = [512]EntryType;
-
-    const PRESENT = BIT(0);
-    const WRITABLE = BIT(1);
-    const USER = BIT(2);
-    const WRITE_THROUGH = BIT(3);
-    const CACHE_DISABLE = BIT(4);
-    const ACCESSED = BIT(5);
-    const DIRTY = BIT(6);
-    const GLOBAL = BIT(8);
-    const NO_EXECUTE = BIT(63);
-
-    const Self = @This();
-
-    fn get_table(self: Self) *TableFormat {
-        return self.phys2virt(self.root).into_pointer(*TableFormat);
-    }
-
-    pub fn get_page(self: Self, idx: IdxType) ?PhysicalAddress {
-        const entry = self.get_table()[idx];
-
-        if (bit_set(entry, PRESENT)) {
-            return PhysicalAddress.new(entry & mask);
-        }
-        return null;
-    }
-
-    pub fn get_entry(self: Self, idx: IdxType) EntryType {
-        return self.get_table()[idx];
-    }
-
-    pub fn set_entry(self: Self, idx: IdxType, entry: EntryType) void {
-        self.get_table()[idx] = entry;
-    }
-
-    pub fn init(pt: PhysicalAddress, base: ?VirtualAddress) PT {
-        return .{ .root = pt, .base = base };
-    }
-
-    fn walk(self: Self, comptime T: type, context: *T) void {
-        var i: PT.IdxType = 0;
-        while (true) : (i += 1) {
-            const page = self.get_page(i);
-            if (page) |entry| {
-                const virt = self.base.?.add(i * mm.KiB(4));
-                context.walk(virt, entry, PageKind.Page4K);
-            }
-
-            if (i == PT.MaxIndex) {
-                break;
-            }
-        }
-    }
-};
-
-pub const PageKind = enum {
-    Page4K,
-    Page2M,
-    Page1G,
-
-    pub fn size(self: @This()) usize {
-        return switch (self) {
-            .Page4K => mm.KiB(4),
-            .Page2M => mm.MiB(2),
-            .Page1G => mm.GiB(1),
-        };
-    }
-};
-
-pub const PD = struct {
-    root: PhysicalAddress,
-    base: ?VirtualAddress,
-    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.directTranslate,
-
-    const EntryType = u64;
-    const IdxType = u9;
-    const MaxIndex = std.math.maxInt(IdxType);
-    const TableFormat = [512]EntryType;
-
-    const PRESENT = BIT(0);
-    const WRITABLE = BIT(1);
-    const USER = BIT(2);
-    const WRITE_THROUGH = BIT(3);
-    const CACHE_DISABLE = BIT(4);
-    const ACCESSED = BIT(5);
-    const DIRTY = BIT(6);
-    const PAGE_2M = BIT(7);
-    const GLOBAL = BIT(8);
-    const NO_EXECUTE = BIT(63);
-
-    const Self = @This();
-
-    const EntryKind = enum {
-        Missing,
-        Page2M,
-        PageTable,
-    };
-
-    fn get_table(self: Self) *TableFormat {
-        return self.phys2virt(self.root).into_pointer(*TableFormat);
-    }
-
-    pub fn get_pt(self: Self, idx: IdxType) ?PT {
-        const entry = self.get_table()[idx];
-
-        if (bit_set(entry, PRESENT) and !bit_set(entry, PAGE_2M)) {
-            // present
-            const virt_base = self.base.?.add(idx * mm.MiB(2));
-            return PT.init(PhysicalAddress.new(entry & mask), virt_base);
-        }
-        return null;
-    }
-
-    pub fn get_page_2m(self: Self, idx: IdxType) ?PhysicalAddress {
-        const entry = self.get_table()[idx];
-
-        if (bit_set(entry, PRESENT) and bit_set(entry, PAGE_2M)) {
-            return PhysicalAddress.new(entry & mask);
-        }
-        return null;
-    }
-
-    pub fn get_entry(self: Self, idx: IdxType) EntryType {
-        return self.get_table()[idx];
-    }
-
-    pub fn get_entry_kind(self: Self, idx: IdxType) EntryKind {
-        const entry = self.get_table()[idx];
-        const is_present = bit_set(entry, PRESENT);
-        const is_2m = bit_set(entry, PAGE_2M);
-
-        if (is_present and is_2m) {
-            return EntryKind.Page2M;
-        } else if (is_present) {
-            return EntryKind.PageTable;
-        }
-
-        return EntryKind.Missing;
-    }
-
-    pub fn set_entry(self: Self, idx: IdxType, entry: EntryType) void {
-        self.get_table()[idx] = entry;
-    }
-
-    pub fn init(pd: PhysicalAddress, base: VirtualAddress) PD {
-        return .{ .root = pd, .base = base };
-    }
-
-    fn walk(self: Self, comptime T: type, context: *T) void {
-        var i: PD.IdxType = 0;
-        while (true) : (i += 1) {
-            switch (self.get_entry_kind(i)) {
-                .PageTable => {
-                    const entry = self.get_pt(i).?;
-                    entry.walk(T, context);
-                },
-                .Page2M => {
-                    const entry = self.get_page_2m(i).?;
-                    context.walk(self.base.?.add(i * mm.MiB(2)), entry, PageKind.Page2M);
-                },
-                else => {},
-            }
-
-            if (i == PD.MaxIndex) {
-                break;
-            }
-        }
-    }
-};
-
-pub const PDPT = struct {
-    root: PhysicalAddress,
-    base: ?VirtualAddress,
-    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.directTranslate,
-
-    const IdxType = u9;
-    const EntryType = u64;
-    const MaxIndex = std.math.maxInt(IdxType);
-    const TableFormat = [MaxIndex + 1]EntryType;
-
-    const PRESENT = BIT(0);
-    const WRITABLE = BIT(1);
-    const USER = BIT(2);
-    const WRITE_THROUGH = BIT(3);
-    const CACHE_DISABLE = BIT(4);
-    const ACCESSED = BIT(5);
-    const DIRTY = BIT(6);
-    const PAGE_1G = BIT(7);
-    const GLOBAL = BIT(8);
-    const NO_EXECUTE = BIT(63);
-
-    const Self = @This();
-
-    fn get_table(self: Self) *TableFormat {
-        return self.phys2virt(self.root).into_pointer(*TableFormat);
-    }
-
-    fn get_entry(self: Self, idx: IdxType) EntryType {
-        return self.get_table()[idx];
-    }
-
-    pub fn set_entry(self: Self, idx: IdxType, entry: EntryType) void {
-        self.get_table()[idx] = entry;
-    }
-
-    pub fn get_pd(self: Self, idx: IdxType) ?PD {
-        const entry = self.get_entry(idx);
-
-        if (bit_set(entry, PRESENT) and !bit_set(entry, PAGE_1G)) {
-            // present
-            const virt_base = self.base.?.add(mm.GiB(1) * idx);
-            return PD.init(PhysicalAddress.new(entry & mask), virt_base);
-        }
-        return null;
-    }
-
-    pub fn init(pdp: PhysicalAddress, base: ?VirtualAddress) PDPT {
-        return .{ .root = pdp, .base = base };
-    }
-
-    fn walk(self: Self, comptime T: type, context: *T) void {
-        var i: PDPT.IdxType = 0;
-        while (true) : (i += 1) {
-            const pd = self.get_pd(i);
-            if (pd) |entry| {
-                entry.walk(T, context);
-            }
-
-            if (i == PDPT.MaxIndex) {
-                break;
-            }
-        }
-    }
-};
-
-const BitStruct = struct {
-    shift: comptime_int,
-
-    pub fn v(comptime self: @This()) comptime_int {
-        return 1 << self.shift;
-    }
-};
-
-pub fn BIT(comptime n: comptime_int) BitStruct {
-    return .{ .shift = n };
-}
-
-pub const PML4 = struct {
-    root: PhysicalAddress,
-    // Missing base implies 4 level paging scheme
-    base: ?VirtualAddress,
-    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.directTranslate,
-
-    const IdxType = u9;
-    const EntryType = u64;
-    const MaxIndex = std.math.maxInt(IdxType);
-
-    const TableFormat = [MaxIndex + 1]EntryType;
-
-    const PRESENT = BIT(0);
-    const WRITABLE = BIT(1);
-    const USER = BIT(2);
-    const WRITE_THROUGH = BIT(3);
-    const CACHE_DISABLE = BIT(4);
-    const ACCESSED = BIT(5);
-
-    const NO_EXECUTE = BIT(63);
-
-    const Self = @This();
-
-    pub fn init(pml4: PhysicalAddress, base: ?VirtualAddress) PML4 {
-        return .{ .root = pml4, .base = base };
-    }
-
-    fn get_table(self: Self) *TableFormat {
-        return self.phys2virt(self.root).into_pointer(*TableFormat);
-    }
-
-    /// Some special handling for 48-bit paging
-    fn get_virt_base(self: Self, idx: IdxType) VirtualAddress {
-        const offset = idx * mm.GiB(512);
-        // Easy case, we know the base
-        if (self.base) |base| {
-            return base.add(offset);
-        }
-
-        // Compute high bits
-        if (bit_set(offset, BIT(47))) {
-            return VirtualAddress.new(0xffff000000000000).add(offset);
-        }
-        return VirtualAddress.new(offset);
-    }
-
-    pub fn get_pdp(self: @This(), idx: IdxType) ?PDPT {
-        const entry = self.get_entry(idx);
-        if (bit_set(entry, PRESENT)) {
-            const virt_base = self.get_virt_base(idx);
-            return PDPT.init(PhysicalAddress.new(entry & mask), virt_base);
-        }
-        return null;
-    }
-
-    pub fn get_entry(self: @This(), idx: IdxType) EntryType {
-        return self.get_table()[idx];
-    }
-
-    pub fn set_entry(self: Self, idx: IdxType, entry: EntryType) void {
-        self.get_table()[idx] = entry;
-    }
-
-    fn walk(self: Self, comptime T: type, context: *T) void {
-        var i: PML4.IdxType = 0;
-        while (true) : (i += 1) {
-            const pdp = self.get_pdp(i);
-            if (pdp) |entry| {
-                entry.walk(T, context);
-            }
-
-            if (i == PML4.MaxIndex) {
-                break;
-            }
-        }
-        context.done();
-    }
-};
-
-const Dumper = struct {
-    const Mapping = struct {
-        virt: VirtualAddress,
-        phys: PhysicalAddress,
-        size: usize,
-    };
-
-    prev: ?Mapping = null,
-
-    pub fn walk(self: *@This(), virt: VirtualAddress, phys: PhysicalAddress, pk: PageKind) void {
-        if (self.prev == null) {
-            self.prev = Mapping{ .virt = virt, .phys = phys, .size = pk.size() };
-            return;
-        }
-        const prev = self.prev.?;
-        // Check if we can merge mapping
-        const next_virt = prev.virt.add(prev.size);
-        const next_phys = prev.phys.add(prev.size);
-        if (next_virt.eq(virt) and next_phys.eq(phys)) {
-            self.prev.?.size += pk.size();
-            return;
-        }
-        logger.log("{} -> {} (0x{x} bytes)\n", .{ prev.virt, prev.phys, prev.size });
-        self.prev = Mapping{ .virt = virt, .phys = phys, .size = pk.size() };
-    }
-
-    pub fn done(self: @This()) void {
-        if (self.prev) |prev| {
-            logger.log("{} -> {} (0x{x} bytes)\n", .{ prev.virt, prev.phys, prev.size });
-        }
-    }
-};
-
 pub const VirtualMemoryImpl = struct {
     allocator: *mm.FrameAllocator,
     pml4: PML4,
@@ -529,6 +161,51 @@ pub const VirtualMemoryImpl = struct {
         x86.CR3.write(self.pml4.root.value);
     }
 
+    pub fn walk(self: Self, comptime T: type, context: *T) void {
+        self.pml4.walk(T, context);
+    }
+
+    fn map_page_4kb(
+        self: Self,
+        where: VirtualAddress,
+        what: PhysicalAddress,
+        options: *const MapOptions,
+    ) !void {
+        if (!where.isAligned(mm.KiB(4)) or !what.isAligned(mm.KiB(4))) {
+            return Error.UnalignedAddress;
+        }
+
+        const pml4_index = get_pml4_slot(where);
+        const pdpt_index = get_pdpt_slot(where);
+        const pd_index = get_pd_slot(where);
+        const pt_index = get_pt_slot(where);
+
+        const pdpt = try self.pml4.get_pdp_alloc(self.allocator, pml4_index);
+        const pd = try pdpt.get_pd_alloc(self.allocator, pdpt_index);
+        const pt = try pd.get_pt_alloc(self.allocator, pdpt_index);
+
+        if (pt.get_entry_kind(pt_index) != PT.EntryKind.Missing) {
+            return Error.MappingExists;
+        }
+
+        var flags: u64 = 0;
+        if (options.writable) {
+            flags |= PT.WRITABLE.v();
+        }
+        if (options.user) {
+            flags |= PT.USER.v();
+        }
+        if (options.write_through) {
+            flags |= PT.WRITE_THROUGH.v();
+        }
+        if (options.cache_disable) {
+            flags |= PT.CACHE_DISABLE.v();
+        }
+        flags |= PD.PRESENT.v();
+
+        pt.set_entry(pt_index, what.value | flags);
+    }
+
     fn map_page_2mb(
         self: Self,
         where: VirtualAddress,
@@ -538,38 +215,18 @@ pub const VirtualMemoryImpl = struct {
         if (!where.isAligned(mm.MiB(2)) or !what.isAligned(mm.MiB(2))) {
             return Error.UnalignedAddress;
         }
-        const pml4_index_ = (where.value >> 39) & 0x1ff;
-        const pdpt_index_ = (where.value >> 30) & 0x1ff;
-        const pd_index_ = (where.value >> 21) & 0x1ff;
-        std.debug.assert(pml4_index_ <= PML4.MaxIndex);
-        std.debug.assert(pdpt_index_ <= PDPT.MaxIndex);
-        std.debug.assert(pd_index_ <= PD.MaxIndex);
 
-        const pml4_index = @intCast(PML4.IdxType, pml4_index_);
-        const pdpt_index = @intCast(PDPT.IdxType, pdpt_index_);
-        const pd_index = @intCast(PD.IdxType, pd_index_);
+        const pml4_index = get_pml4_slot(where);
+        const pdpt_index = get_pdpt_slot(where);
+        const pd_index = get_pd_slot(where);
 
-        if (self.pml4.get_pdp(pml4_index) == null) {
-            //logger.log("Allocated PML4[{}] missing \n", .{pml4_index});
-            const frame = try self.allocator.alloc_zero_frame();
-            //logger.log("Allocated PML4[{}] = {}\n", .{ pml4_index, frame });
-            const v = frame.value | PML4.WRITABLE.v() | PML4.PRESENT.v();
-            self.pml4.set_entry(pml4_index, v);
-        }
-        const pdpt = self.pml4.get_pdp(pml4_index).?;
+        const pdpt = try self.pml4.get_pdp_alloc(self.allocator, pml4_index);
+        const pd = try pdpt.get_pd_alloc(self.allocator, pdpt_index);
 
-        if (pdpt.get_pd(pdpt_index) == null) {
-            //logger.log("Allocated PML4[{}] PD[{}] missing \n", .{ pml4_index, pdpt_index });
-            const frame = try self.allocator.alloc_zero_frame();
-            //logger.log("Allocated PML4[{}] PD[{}] = {}\n", .{ pml4_index, pdpt_index, frame });
-            const v = frame.value | PDPT.WRITABLE.v() | PDPT.PRESENT.v();
-            pdpt.set_entry(pdpt_index, v);
-        }
-
-        const pd = pdpt.get_pd(pdpt_index).?;
         if (pd.get_entry_kind(pd_index) != PD.EntryKind.Missing) {
             return Error.MappingExists;
         }
+
         var flags: u64 = 0;
         if (options.writable) {
             flags |= PD.WRITABLE.v();
@@ -587,7 +244,9 @@ pub const VirtualMemoryImpl = struct {
             flags |= PD.CACHE_DISABLE.v();
         }
 
-        pd.set_entry(pd_index, what.value | flags | PD.PRESENT.v() | PD.PAGE_2M.v());
+        flags |= PD.PRESENT.v() | PD.PAGE_2M.v();
+
+        pd.set_entry(pd_index, what.value | flags);
     }
 
     pub fn map_addr(
@@ -598,7 +257,7 @@ pub const VirtualMemoryImpl = struct {
         options: *const MapOptions,
     ) !void {
         switch (length) {
-            mm.KiB(4) => @panic("Unimplemented"),
+            mm.KiB(4) => return self.map_page_4kb(where, what, options),
             mm.MiB(2) => return self.map_page_2mb(where, what, options),
             mm.GiB(1) => @panic("Unimplemented"),
             else => return Error.InvalidSize,
@@ -612,13 +271,18 @@ pub const VirtualMemoryImpl = struct {
         size: usize,
         options: *const MapOptions,
     ) !mm.VirtualMemoryRange {
-        const unit = mm.MiB(2);
-        var left = std.mem.alignForward(size, unit);
+        // Align to smallest page
+        var left = std.mem.alignForward(size, 0x1000);
+
         var done: usize = 0;
+        var unit: usize = undefined;
         while (left != 0) : ({
             left -= unit;
             done += unit;
         }) {
+            unit = init: {
+                break :init mm.MiB(2);
+            };
             self.map_addr(
                 where.add(done),
                 what.add(done),
@@ -662,11 +326,6 @@ pub const VirtualMemoryImpl = struct {
     }
 };
 
-pub fn dump_vm_mappings(vm: *mm.VirtualMemory) void {
-    var visitor = Dumper{};
-    vm.vm_impl.pml4.walk(Dumper, &visitor);
-}
-
 var kernel_vm_impl: VirtualMemoryImpl = undefined;
 
 fn setup_kernel_vm() !void {
@@ -703,7 +362,7 @@ fn setup_kernel_vm() !void {
     directMapping().virt_start = DIRECT_MAPPING.base;
     directMapping().size = initial_mapping_size;
 
-    dump_vm_mappings(&mm.kernel_vm);
+    kernel.mm.dump_vm_mappings(&mm.kernel_vm);
 
     logger.log("Mapping rest of direct memory\n", .{});
     try mm.kernel_vm.map_memory(
