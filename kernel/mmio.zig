@@ -28,7 +28,7 @@ pub fn MMIORegister(comptime T: type) type {
             return @intToPtr(*volatile T, self.mmio_region.base + self.offset).*;
         }
 
-        pub fn write(value: T) void {
+        pub fn write(self: @This(), value: T) void {
             @intToPtr(*volatile T, self.mmio_region.base + self.offset).* = value;
         }
     };
