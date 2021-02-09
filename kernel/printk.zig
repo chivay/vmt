@@ -20,7 +20,7 @@ fn do_printk(buffer: []const u8) void {
 
 var printk_buffer: [0x1000]u8 = undefined;
 var fbs = std.io.fixedBufferStream(&printk_buffer);
-var out_stream = fbs.outStream();
+var out_stream = fbs.writer();
 
 pub fn printk(comptime fmt: []const u8, args: anytype) void {
     fbs.reset();

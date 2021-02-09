@@ -225,7 +225,7 @@ const MADTEntryType = enum(u8) {
     _,
 };
 
-fn intToEnumSafe(comptime T: type, value: @TagType(T)) ?T {
+fn intToEnumSafe(comptime T: type, value: std.meta.Tag(T)) ?T {
     const enumInfo = switch (@typeInfo(T)) {
         .Enum => |enumInfo| enumInfo,
         else => @compileError("Invalid type"),

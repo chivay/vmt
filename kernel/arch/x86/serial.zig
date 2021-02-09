@@ -14,9 +14,9 @@ pub fn SerialPort(comptime id: u8) type {
         const Self = @This();
 
         const SerialError = error{SerialError};
-        pub const OutStream = io.OutStream(Self, SerialError, write);
+        pub const Writer = io.Writer(Self, SerialError, write);
 
-        pub fn outStream() OutStream {
+        pub fn writer() Writer {
             return .{ .context = Self{} };
         }
 

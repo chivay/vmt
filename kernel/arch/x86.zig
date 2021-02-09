@@ -269,11 +269,11 @@ pub const GSBASE = MSR(0xC000_0101);
 pub const KERNEL_GSBASE = MSR(0xC000_0102);
 
 fn format_to_vga(buffer: []const u8) void {
-    vga.getConsole().outStream().writeAll(buffer) catch |err| {};
+    vga.getConsole().writer().writeAll(buffer) catch |err| {};
 }
 
 fn format_to_com1(buffer: []const u8) void {
-    serial.SerialPort(1).outStream().writeAll(buffer) catch |err| {};
+    serial.SerialPort(1).writer().writeAll(buffer) catch |err| {};
 }
 
 const Node = kernel.printk_mod.SinkNode;

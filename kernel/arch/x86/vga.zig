@@ -115,9 +115,9 @@ pub const VGAConsole = struct {
     const Self = @This();
 
     const VGAError = error{VGAError};
-    pub const OutStream = io.OutStream(*VGAConsole, VGAError, write);
+    pub const Writer = io.Writer(*VGAConsole, VGAError, write);
 
-    pub fn outStream(self: *Self) OutStream {
+    pub fn writer(self: *Self) Writer {
         return .{ .context = self };
     }
 
