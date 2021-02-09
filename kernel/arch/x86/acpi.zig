@@ -308,7 +308,7 @@ pub fn parse_table(addr: PhysicalAddress) void {
     } else if (std.mem.eql(u8, header.signature[0..], "APIC")) {
         parse_apic(header);
     } else {
-        logger.log("Unknown signature {}\n", .{header.signature});
+        logger.log("Unknown signature {e}\n", .{header.signature});
     }
 }
 

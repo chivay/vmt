@@ -101,7 +101,7 @@ fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?mm.PhysicalMemoryRange
             5 => "Defective",
             else => "Reserved",
         };
-        logger.log("[{x:0>10}-{x:0>10}] {}\n", .{ start, end, status });
+        logger.log("[{x:0>10}-{x:0>10}] {s}\n", .{ start, end, status });
         offset = offset.add(entry.size + @sizeOf(@TypeOf(entry.size)));
 
         if (entry.type_ != 1) {

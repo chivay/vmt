@@ -306,7 +306,7 @@ fn mb_entry(mb_info: u32) callconv(.C) noreturn {
     multiboot.info_pointer = info;
 
     logger.debug("CR3: 0x{x}\n", .{CR3.read()});
-    logger.info("CPU Vendor: {}\n", .{get_vendor_string()});
+    logger.info("CPU Vendor: {e}\n", .{get_vendor_string()});
     logger.debug("Kernel end: {x}\n", .{mm.get_kernel_end()});
 
     logger.info("Booting the kernel...\n", .{});
