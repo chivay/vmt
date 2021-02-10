@@ -42,7 +42,7 @@ extern fn __cpuid(
     subleaf: u32, // edx
 ) void;
 
-pub fn cpuid(leaf: u32, subleaf: u32) CPUIDInfo {
+pub inline fn cpuid(leaf: u32, subleaf: u32) CPUIDInfo {
     var info: CPUIDInfo = undefined;
     __cpuid(&info, leaf, subleaf);
     return info;
