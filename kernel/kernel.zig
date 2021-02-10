@@ -29,7 +29,7 @@ pub fn BIT(comptime n: comptime_int) BitStruct {
 }
 
 pub fn panic(msg: []const u8, return_trace: ?*builtin.StackTrace) noreturn {
-    logger.critical("PANIK: {}\n", .{msg});
+    logger.critical("PANIK: {s}\n", .{msg});
     arch.hang();
 }
 
