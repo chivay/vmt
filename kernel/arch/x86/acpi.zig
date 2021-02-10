@@ -1,7 +1,7 @@
 const std = @import("std");
 const kernel = @import("root");
 const printk = kernel.printk;
-const logger = @import("../x86.zig").logger.childOf(@typeName(@This()));
+const logger = @TypeOf(@import("../x86.zig").logger).childOf(@typeName(@This())){};
 const mm = kernel.mm;
 
 const PhysicalAddress = kernel.mm.PhysicalAddress;

@@ -1,8 +1,9 @@
 const kernel = @import("root");
 const mm = kernel.mm;
 const x86 = @import("../x86.zig");
-const logger = x86.logger.childOf(@typeName(@This()));
 const APIC_MSR = x86.APIC_BASE;
+
+var logger = @TypeOf(x86.logger).childOf(@typeName(@This())){};
 
 pub fn apic_enabled() bool {
     return (APIC_MSR.read() & (1 << 11)) != 0;

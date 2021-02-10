@@ -14,7 +14,7 @@ pub const acpi = @import("x86/acpi.zig");
 pub const pci = @import("x86/pci.zig");
 pub const apic = @import("x86/apic.zig");
 
-pub const logger = kernel.printk_mod.logger("x86");
+pub var logger = kernel.printk_mod.logger("x86"){};
 
 const GDT = GlobalDescriptorTable(8);
 const IDT = InterruptDescriptorTable;

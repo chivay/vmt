@@ -2,7 +2,7 @@ const std = @import("std");
 const arch = @import("root").arch;
 const kernel = @import("kernel.zig");
 
-const logger = kernel.logger.childOf(@typeName(@This()));
+const logger = @TypeOf(kernel.logger).childOf(@typeName(@This())){};
 
 pub fn directMapping() *DirectMapping {
     return arch.mm.directMapping();

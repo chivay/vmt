@@ -14,7 +14,7 @@ pub const PhysAddrType = u64;
 const BIT = kernel.BIT;
 const bit_set = kernel.bit_set;
 
-const logger = x86.logger.childOf(@typeName(@This()));
+pub var logger = @TypeOf(x86.logger).childOf(@typeName(@This())){};
 
 const KERNEL_MEMORY_MAP = [_]mm.VirtualMemoryRange{
     DIRECT_MAPPING,
@@ -333,7 +333,7 @@ fn setup_kernel_vm() !void {
     mm.kernel_vm = mm.VirtualMemory.init(&kernel_vm_impl);
 
     // Initial 1GiB mapping
-    logger.log("Identity mapping 1GiB from 0 phys\n", .{});
+    logger.debug("Identity mapping 1GiB from 0 phys\n", .{});
     const initial_mapping_size = mm.GiB(1);
     try mm.kernel_vm.map_memory(
         DIRECT_MAPPING.base,
@@ -342,7 +342,7 @@ fn setup_kernel_vm() !void {
     );
 
     // Map kernel image
-    logger.log("Mapping kernel image\n", .{});
+    logger.debug("Mapping kernel image\n", .{});
     const kern_end = VirtualAddress.new(@ptrToInt(&kernel_end));
     const kernel_size = VirtualAddress.span(KERNEL_IMAGE.base, kern_end);
     mm.kernel_vm.map_memory(
@@ -354,9 +354,9 @@ fn setup_kernel_vm() !void {
         @panic("Failed to remap kernel");
     };
 
-    logger.log("Switching to new virtual memory\n", .{});
+    logger.debug("Switching to new virtual memory\n", .{});
     mm.kernel_vm.switch_to();
-    logger.log("Survived switching to kernel VM\n", .{});
+    logger.debug("Survived switching to kernel VM\n", .{});
 
     // switch to new virtual memory
     directMapping().virt_start = DIRECT_MAPPING.base;
@@ -364,7 +364,7 @@ fn setup_kernel_vm() !void {
 
     kernel.mm.dump_vm_mappings(&mm.kernel_vm);
 
-    logger.log("Mapping rest of direct memory\n", .{});
+    logger.debug("Mapping rest of direct memory\n", .{});
     try mm.kernel_vm.map_memory(
         DIRECT_MAPPING.base.add(initial_mapping_size),
         PhysicalAddress.new(0 + initial_mapping_size),
@@ -373,7 +373,7 @@ fn setup_kernel_vm() !void {
 
     directMapping().virt_start = DIRECT_MAPPING.base;
     directMapping().size = mm.GiB(64);
-    logger.log("VM setup done\n", .{});
+    logger.debug("VM setup done\n", .{});
 }
 
 pub fn init() void {

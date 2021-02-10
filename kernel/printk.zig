@@ -38,37 +38,43 @@ pub const LogLevel = enum {
 
 pub fn logger(comptime prefix: []const u8) type {
     return struct {
+        pub const Level = LogLevel;
         const PREFIX = prefix;
-        const log_level = LogLevel.Info;
 
-        pub fn log(comptime fmt: []const u8, args: anytype) void {
-            log_raw(LogLevel.Info, fmt, args);
+        log_level: LogLevel = LogLevel.Info,
+
+        pub fn log(self: @This(), comptime fmt: []const u8, args: anytype) void {
+            self.log_raw(LogLevel.Info, fmt, args);
         }
 
-        fn log_raw(comptime level: LogLevel, comptime fmt: []const u8, args: anytype) void {
-            if (comptime (@enumToInt(level) >= @enumToInt(log_level))) {
+        pub fn setLevel(self: *@This(), level: LogLevel) void {
+            self.log_level = level;
+        }
+
+        fn log_raw(self: @This(), comptime level: LogLevel, comptime fmt: []const u8, args: anytype) void {
+            if (comptime (@enumToInt(level) <= @enumToInt(self.log_level))) {
                 printk("[" ++ @tagName(level) ++ "] " ++ PREFIX ++ ": " ++ fmt, args);
             }
         }
 
-        pub fn info(comptime fmt: []const u8, args: anytype) void {
-            log_raw(LogLevel.Info, fmt, args);
+        pub fn info(self: @This(), comptime fmt: []const u8, args: anytype) void {
+            self.log_raw(LogLevel.Info, fmt, args);
         }
 
-        pub fn debug(comptime fmt: []const u8, args: anytype) void {
-            log_raw(LogLevel.Debug, fmt, args);
+        pub fn debug(self: @This(), comptime fmt: []const u8, args: anytype) void {
+            self.log_raw(LogLevel.Debug, fmt, args);
         }
 
-        pub fn err(comptime fmt: []const u8, args: anytype) void {
-            log_raw(LogLevel.Error, fmt, args);
+        pub fn err(self: @This(), comptime fmt: []const u8, args: anytype) void {
+            self.log_raw(LogLevel.Error, fmt, args);
         }
 
-        pub fn warning(comptime fmt: []const u8, args: anytype) void {
-            log_raw(LogLevel.Warning, fmt, args);
+        pub fn warning(self: @This(), comptime fmt: []const u8, args: anytype) void {
+            self.log_raw(LogLevel.Warning, fmt, args);
         }
 
-        pub fn critical(comptime fmt: []const u8, args: anytype) void {
-            log_raw(LogLevel.Critical, fmt, args);
+        pub fn critical(self: @This(), comptime fmt: []const u8, args: anytype) void {
+            self.log_raw(LogLevel.Critical, fmt, args);
         }
 
         pub fn childOf(child_prefix: []const u8) type {
