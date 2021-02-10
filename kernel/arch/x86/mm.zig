@@ -272,23 +272,38 @@ pub const VirtualMemoryImpl = struct {
         options: *const MapOptions,
     ) !mm.VirtualMemoryRange {
         // Align to smallest page
-        var left = std.mem.alignForward(size, 0x1000);
+        var left = std.mem.alignForward(size, PageKind.Page4K.size());
 
         var done: usize = 0;
-        var unit: usize = undefined;
+        var unit: PageKind = undefined;
         while (left != 0) : ({
-            left -= unit;
-            done += unit;
+            left -= unit.size();
+            done += unit.size();
         }) {
-            unit = init: {
-                break :init mm.MiB(2);
+            const where_addr = where.add(done);
+            const what_addr = what.add(done);
+
+            const use_2mb = init: {
+                if (!where_addr.isAligned(mm.MiB(2))) {
+                    break :init false;
+                }
+                if (!what_addr.isAligned(mm.MiB(2))) {
+                    break :init false;
+                }
+                if (left < mm.MiB(2)) {
+                    break :init false;
+                }
+                break :init true;
             };
-            self.map_addr(
-                where.add(done),
-                what.add(done),
-                unit,
-                options,
-            ) catch |err| {
+
+            if (use_2mb) {
+                unit = PageKind.Page2M;
+            } else {
+                unit = PageKind.Page4K;
+            }
+
+            logger.debug("Mapping {} to {} ({x})\n", .{ what_addr, where_addr, unit });
+            self.map_addr(where_addr, what_addr, unit.size(), options) catch |err| {
                 logger.log("{}\n", .{err});
                 @panic("Failed to setup direct mapping");
             };
