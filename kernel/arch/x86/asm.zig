@@ -1,22 +1,5 @@
 const x86 = @import("root").arch.x86;
 
-comptime {
-    asm (
-        \\.type __cpuid @function;
-        \\__cpuid:
-        \\  push %rbx
-        \\  mov %esi, %eax
-        \\  mov %edx, %ecx
-        \\  cpuid
-        \\  mov %eax, 0(%rdi)
-        \\  mov %ebx, 4(%rdi)
-        \\  mov %ecx, 8(%rdi)
-        \\  mov %edx, 12(%rdi)
-        \\  pop %rbx
-        \\  retq
-    );
-}
-
 pub const CPUIDInfo = packed struct {
     eax: u32,
     ebx: u32,
@@ -35,16 +18,21 @@ pub const CPUIDInfo = packed struct {
     }
 };
 
-// Implicit C calling convention ?
-extern fn __cpuid(
-    info: *CPUIDInfo, // rdi
-    leaf: u32, // esi
-    subleaf: u32, // edx
-) void;
-
 pub inline fn cpuid(leaf: u32, subleaf: u32) CPUIDInfo {
     var info: CPUIDInfo = undefined;
-    __cpuid(&info, leaf, subleaf);
+    asm volatile (
+        \\ cpuid
+        \\ movl %%eax, 0(%[info])
+        \\ movl %%ebx, 4(%[info])
+        \\ movl %%ecx, 8(%[info])
+        \\ movl %%edx, 12(%[info])
+        :
+        : [leaf] "{eax}" (leaf),
+          [subleaf] "{ecx}" (subleaf),
+          [info] "r" (&info)
+        : "eax", "ebx", "ecx", "edx"
+    );
+
     return info;
 }
 
