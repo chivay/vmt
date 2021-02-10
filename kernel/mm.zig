@@ -374,6 +374,11 @@ pub fn MemoryRange(comptime T: type) type {
             const size = T.span(start, end);
             return .{ .base = start, .size = size };
         }
+
+        pub fn as_bytes(self: Self) []u8 {
+            const ptr = @intToPtr([*]u8, self.base.value);
+            return ptr[0..(self.size)];
+        }
     };
 }
 
