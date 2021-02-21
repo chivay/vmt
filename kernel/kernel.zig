@@ -8,6 +8,7 @@ pub const mm = @import("mm.zig");
 pub const arch = @import("arch.zig");
 pub const mmio = @import("mmio.zig");
 pub const task = @import("task.zig");
+pub const lib = @import("lib.zig");
 const Task = task.Task;
 
 pub const logger = printk_mod.logger("kernel"){};
@@ -70,7 +71,5 @@ pub fn kmain() void {
     scheduler.addTask(taskA);
     scheduler.addTask(taskB);
 
-    while (true) {
-        scheduler.yield();
-    }
+    arch.idle();
 }

@@ -13,15 +13,17 @@ pub const multiboot = @import("x86/multiboot.zig");
 pub const acpi = @import("x86/acpi.zig");
 pub const pci = @import("x86/pci.zig");
 pub const apic = @import("x86/apic.zig");
+pub const trampoline = @import("x86/trampoline.zig");
+pub const smp = @import("x86/smp.zig");
 
 pub var logger = kernel.printk_mod.logger("x86"){};
 
 const GDT = GlobalDescriptorTable(8);
 const IDT = InterruptDescriptorTable;
 
-var main_gdt align(64) = GDT.new();
-var main_tss align(64) = std.mem.zeroes(TSS);
-var main_idt align(64) = std.mem.zeroes(IDT);
+pub var main_gdt align(64) = GDT.new();
+pub var main_tss align(64) = std.mem.zeroes(TSS);
+pub var main_idt align(64) = std.mem.zeroes(IDT);
 
 pub const TaskRegs = packed struct {
     // Layout must be kept in sync with asm_switch_stack
@@ -497,14 +499,20 @@ const exception_stubs = init: {
     break :init stubs;
 };
 
+pub var null_entry: SegmentSelector = undefined;
+pub var kernel_code: SegmentSelector = undefined;
+pub var kernel_data: SegmentSelector = undefined;
+pub var user_code: SegmentSelector = undefined;
+pub var user_data: SegmentSelector = undefined;
+
 pub fn init_cpu() !void {
     const Entry = GDT.Entry;
 
-    const null_entry = main_gdt.add_entry(Entry.nil);
-    const kernel_code = main_gdt.add_entry(Entry.KernelCode);
-    const kernel_data = main_gdt.add_entry(Entry.KernelData);
-    const user_code = main_gdt.add_entry(Entry.UserCode);
-    const user_data = main_gdt.add_entry(Entry.UserData);
+    null_entry = main_gdt.add_entry(Entry.nil);
+    kernel_code = main_gdt.add_entry(Entry.KernelCode);
+    kernel_data = main_gdt.add_entry(Entry.KernelData);
+    user_code = main_gdt.add_entry(Entry.UserCode);
+    user_data = main_gdt.add_entry(Entry.UserData);
 
     // Kinda ugly, refactor this
     //const tss_base = main_gdt.add_entry(Entry.TaskState(&main_tss)[0]);
@@ -531,14 +539,16 @@ pub fn init_cpu() !void {
 
     GSBASE.write(@ptrToInt(&boot_cpu_gsstruct));
 
-    pic.remap(0x30, 0x38);
-    // enable only keyboard interrupt
-    pic.Master.data_write(0xfd);
-    pic.Slave.data_write(0xff);
+    //pic.remap(0x30, 0x38);
+    //// enable only keyboard interrupt
+    //pic.Master.data_write(0xfd);
+    //pic.Slave.data_write(0xff);
 }
 
 pub fn init() void {
+    trampoline.init();
     acpi.init();
     apic.init();
     pci.init();
+    smp.init();
 }

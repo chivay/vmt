@@ -341,7 +341,7 @@ pub const VirtualMemoryImpl = struct {
     }
 };
 
-var kernel_vm_impl: VirtualMemoryImpl = undefined;
+pub var kernel_vm_impl: VirtualMemoryImpl = undefined;
 
 fn setup_kernel_vm() !void {
     // Initialize generic kernel VM
