@@ -6,6 +6,8 @@ const Arch = std.Target.Cpu.Arch;
 const CpuFeature = std.Target.Cpu.Feature;
 
 fn build_x86_64(kernel: *std.build.LibExeObjStep) void {
+    const builder = kernel.builder;
+
     const cross_target = CrossTarget{
         .cpu_arch = Arch.x86_64,
         .cpu_model = CrossTarget.CpuModel.baseline,
@@ -34,14 +36,18 @@ fn build_x86_64(kernel: *std.build.LibExeObjStep) void {
     kernel.addAssemblyFile("kernel/arch/x86/boot.S");
     kernel.setOutputDir("build/x86_64");
 
-    var iso_tls = kernel.builder.step("iso", "Build multiboot ISO");
+    const trampolines = builder.addAssemble("trampolines", "kernel/arch/x86/trampolines.S");
+    trampolines.setOutputDir("build/x86_64");
+    kernel.step.dependOn(&trampolines.step);
 
-    var iso = kernel.builder.addSystemCommand(&[_][]const u8{"scripts/mkiso.sh"});
+    var iso_tls = builder.step("iso", "Build multiboot ISO");
+
+    var iso = builder.addSystemCommand(&[_][]const u8{"scripts/mkiso.sh"});
     iso.addArtifactArg(kernel);
     iso_tls.dependOn(&iso.step);
 
-    var qemu_tls = kernel.builder.step("qemu", "Run QEMU");
-    var qemu = kernel.builder.addSystemCommand(&[_][]const u8{"qemu-system-x86_64"});
+    var qemu_tls = builder.step("qemu", "Run QEMU");
+    var qemu = builder.addSystemCommand(&[_][]const u8{"qemu-system-x86_64"});
     qemu.addArgs(&[_][]const u8{
         "-enable-kvm",
         "-cdrom",
@@ -54,12 +60,14 @@ fn build_x86_64(kernel: *std.build.LibExeObjStep) void {
         "1G",
         "-M",
         "q35",
+        "-smp",
+        "4",
     });
 
     qemu.step.dependOn(&iso.step);
     qemu_tls.dependOn(&qemu.step);
 
-    kernel.builder.default_step = qemu_tls;
+    builder.default_step = qemu_tls;
 }
 
 fn build_arm64(kernel: *std.build.LibExeObjStep) void {
