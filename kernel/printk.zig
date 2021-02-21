@@ -1,4 +1,5 @@
 const std = @import("std");
+const kernel = @import("root");
 
 const SinglyLinkedList = std.SinglyLinkedList;
 pub const PrintkSink = fn ([]const u8) void;
@@ -10,6 +11,8 @@ var printk_sinks = SinglyLinkedList(PrintkSink){ .first = null };
 pub fn register_sink(sink: *SinkNode) void {
     printk_sinks.prepend(sink);
 }
+
+var printk_spinlock = kernel.lib.spinlock.SpinLock.init();
 
 fn do_printk(buffer: []const u8) void {
     var sink = printk_sinks.first;
@@ -23,6 +26,9 @@ var fbs = std.io.fixedBufferStream(&printk_buffer);
 var out_stream = fbs.writer();
 
 pub fn printk(comptime fmt: []const u8, args: anytype) void {
+    const lock = printk_spinlock.acquire();
+    defer lock.release();
+
     fbs.reset();
     std.fmt.format(out_stream, fmt, args) catch |err| {};
     do_printk(fbs.getWritten());
