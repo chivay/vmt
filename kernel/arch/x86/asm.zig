@@ -18,7 +18,7 @@ pub const CPUIDInfo = packed struct {
     }
 };
 
-pub inline fn cpuid(leaf: u32, subleaf: u32) CPUIDInfo {
+pub fn cpuid(leaf: u32, subleaf: u32) callconv(.Inline) CPUIDInfo {
     var info: CPUIDInfo = undefined;
     asm volatile (
         \\ cpuid
@@ -37,13 +37,13 @@ pub inline fn cpuid(leaf: u32, subleaf: u32) CPUIDInfo {
 }
 
 pub const CR3 = struct {
-    pub inline fn read() u64 {
+    pub fn read() callconv(.Inline) u64 {
         return asm volatile ("movq %%cr3, %[ret]"
             : [ret] "=rax" (-> u64)
         );
     }
 
-    pub inline fn write(value: u64) void {
+    pub fn write(value: u64) callconv(.Inline) void {
         asm volatile ("movq %[value], %%cr3"
             :
             : [value] "{rax}" (value)
@@ -51,21 +51,21 @@ pub const CR3 = struct {
     }
 };
 
-pub inline fn ltr(selector: u16) void {
+pub fn ltr(selector: u16) callconv(.Inline) void {
     asm volatile ("ltr %[selector]"
         :
         : [selector] "{ax}" (selector)
     );
 }
 
-pub inline fn lgdt(addr: u64) void {
+pub fn lgdt(addr: u64) callconv(.Inline) void {
     asm volatile ("lgdt (%[addr])"
         :
         : [addr] "{rdi}" (addr)
     );
 }
 
-pub inline fn out(comptime T: type, address: u16, value: T) void {
+pub fn out(comptime T: type, address: u16, value: T) callconv(.Inline) void {
     switch (T) {
         u8 => asm volatile ("out %[value], %[address]"
             :
@@ -86,7 +86,7 @@ pub inline fn out(comptime T: type, address: u16, value: T) void {
     }
 }
 
-pub inline fn in(comptime T: type, address: u16) T {
+pub fn in(comptime T: type, address: u16) callconv(.Inline) T {
     return switch (T) {
         u8 => asm volatile ("in %[address], %[ret]"
             : [ret] "={al}" (-> u8)
@@ -104,61 +104,61 @@ pub inline fn in(comptime T: type, address: u16) T {
     };
 }
 
-pub inline fn hlt() void {
+pub fn hlt() callconv(.Inline) void {
     asm volatile ("hlt");
 }
 
-pub inline fn cli() void {
+pub fn cli() callconv(.Inline) void {
     asm volatile ("cli");
 }
 
-pub inline fn sti() void {
+pub fn sti() callconv(.Inline) void {
     asm volatile ("sti");
 }
 
-pub inline fn lidt(addr: u64) void {
+pub fn lidt(addr: u64) callconv(.Inline) void {
     asm volatile ("lidt (%[addr])"
         :
         : [addr] "{rdi}" (addr)
     );
 }
 
-pub inline fn set_ds(selector: u16) void {
+pub fn set_ds(selector: u16) callconv(.Inline) void {
     asm volatile ("movl %[selector], %%ds"
         :
         : [selector] "{eax}" (selector)
     );
 }
 
-pub inline fn set_es(selector: u16) void {
+pub fn set_es(selector: u16) callconv(.Inline) void {
     asm volatile ("movl %[selector], %%es"
         :
         : [selector] "{eax}" (selector)
     );
 }
 
-pub inline fn set_fs(selector: u16) void {
+pub fn set_fs(selector: u16) callconv(.Inline) void {
     asm volatile ("movl %[selector], %%fs"
         :
         : [selector] "{eax}" (selector)
     );
 }
 
-pub inline fn set_gs(selector: u16) void {
+pub fn set_gs(selector: u16) callconv(.Inline) void {
     asm volatile ("movl %[selector], %%gs"
         :
         : [selector] "{eax}" (selector)
     );
 }
 
-pub inline fn set_ss(selector: u16) void {
+pub fn set_ss(selector: u16) callconv(.Inline) void {
     asm volatile ("movl %[selector], %%ss"
         :
         : [selector] "{eax}" (selector)
     );
 }
 
-pub inline fn rdmsr(which: u32) u64 {
+pub fn rdmsr(which: u32) callconv(.Inline) u64 {
     return asm volatile (
         \\ rdmsr
         \\ # results are in EDX:EAX
@@ -170,7 +170,7 @@ pub inline fn rdmsr(which: u32) u64 {
     );
 }
 
-pub inline fn wrmsr(which: u32, value: u64) void {
+pub fn wrmsr(which: u32, value: u64) callconv(.Inline) void {
     return asm volatile ("wrmsr"
         :
         : [high] "{edx}" (value >> 32),

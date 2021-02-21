@@ -251,10 +251,10 @@ pub fn hang() noreturn {
 
 pub fn MSR(n: u32) type {
     return struct {
-        pub inline fn read() u64 {
+        pub fn read() callconv(.Inline) u64 {
             return rdmsr(n);
         }
-        pub inline fn write(value: u64) void {
+        pub fn write(value: u64) callconv(.Inline) void {
             wrmsr(n, value);
         }
     };
