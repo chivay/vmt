@@ -1,9 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-pub const printk = @import("printk.zig").printk;
-
-pub const printk_mod = @import("printk.zig");
+pub const logging = @import("logging.zig");
 pub const mm = @import("mm.zig");
 pub const arch = @import("arch.zig");
 pub const mmio = @import("mmio.zig");
@@ -11,7 +9,7 @@ pub const task = @import("task.zig");
 pub const lib = @import("lib.zig");
 const Task = task.Task;
 
-pub const logger = printk_mod.logger("kernel"){};
+pub const logger = logging.logger("kernel"){};
 
 pub fn bit_set(value: anytype, comptime bit: BitStruct) bool {
     return (value & (1 << bit.shift)) != 0;

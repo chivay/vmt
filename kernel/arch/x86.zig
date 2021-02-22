@@ -16,7 +16,7 @@ pub const apic = @import("x86/apic.zig");
 pub const trampoline = @import("x86/trampoline.zig");
 pub const smp = @import("x86/smp.zig");
 
-pub var logger = kernel.printk_mod.logger("x86"){};
+pub var logger = kernel.logging.logger("x86"){};
 
 const GDT = GlobalDescriptorTable(8);
 const IDT = InterruptDescriptorTable;
@@ -278,7 +278,7 @@ fn format_to_com1(buffer: []const u8) void {
     serial.SerialPort(1).writer().writeAll(buffer) catch |err| {};
 }
 
-const Node = kernel.printk_mod.SinkNode;
+const Node = kernel.logging.SinkNode;
 
 var vga_node = Node{ .data = format_to_vga };
 var serial_node = Node{ .data = format_to_com1 };
@@ -293,8 +293,8 @@ export fn multiboot_entry(mb_info: u32) callconv(.C) noreturn {
 }
 
 fn mb_entry(mb_info: u32) callconv(.C) noreturn {
-    kernel.printk_mod.register_sink(&vga_node);
-    kernel.printk_mod.register_sink(&serial_node);
+    kernel.logging.register_sink(&vga_node);
+    kernel.logging.register_sink(&serial_node);
 
     // setup identity mapping
     const VIRT_START = kernel.mm.VirtualAddress.new(@ptrToInt(&KERNEL_VIRT_BASE));
