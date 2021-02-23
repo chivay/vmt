@@ -31,6 +31,7 @@ fn build_x86_64(kernel: *std.build.LibExeObjStep) void {
     };
     kernel.setTarget(cross_target);
     kernel.code_model = builtin.CodeModel.kernel;
+    kernel.want_lto = false;
 
     kernel.setLinkerScriptPath("kernel/arch/x86/linker.ld");
     kernel.addAssemblyFile("kernel/arch/x86/boot.S");
