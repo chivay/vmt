@@ -203,14 +203,14 @@ fn parse_mcfg(header: *SDTHeader) void {
     }
 }
 
-const MADTLapicEntry = packed struct {
+pub const MADTLapicEntry = packed struct {
     madt_header: MADTHeader,
     processor_uid: u8,
     apic_id: u8,
     flags: u32,
 };
 
-const MADTEntryType = enum(u8) {
+pub const MADTEntryType = enum(u8) {
     LocalApic = 0,
     IoApic = 1,
     InterruptSourceOverrride = 2,
@@ -225,24 +225,6 @@ const MADTEntryType = enum(u8) {
     _,
 };
 
-fn intToEnumSafe(comptime T: type, value: std.meta.Tag(T)) ?T {
-    const enumInfo = switch (@typeInfo(T)) {
-        .Enum => |enumInfo| enumInfo,
-        else => @compileError("Invalid type"),
-    };
-
-    comptime if (enumInfo.is_exhaustive) {
-        return @intToEnum(T, value);
-    };
-
-    inline for (enumInfo.fields) |enumField| {
-        if (value == enumField.value) {
-            return @intToEnum(T, value);
-        }
-    }
-    return null;
-}
-
 const MADTInfo = packed struct {
     lapic_address: u32,
     // The 8259 vectors must be disabled (that is, masked) when
@@ -255,7 +237,7 @@ const MADTHeader = packed struct {
     record_length: u8,
 };
 
-const MADTLapic = packed struct {
+pub const MADTLapic = packed struct {
     header: MADTHeader,
     acpi_processor_uid: u8,
     apic_uid: u8,
@@ -265,67 +247,89 @@ const MADTLapic = packed struct {
 fn parse_apic(header: *SDTHeader) void {
     logger.log("Parsing MADT\n", .{});
     //logger.log("{}\n", .{header});
-    const data_length = header.length - @sizeOf(SDTHeader);
-    var data = @intToPtr([*]u8, @ptrToInt(header) + @sizeOf(SDTHeader))[0..data_length];
-
-    var madt_info_slice = data[0..@sizeOf(MADTInfo)];
-
-    const madt_info: *MADTInfo = @ptrCast(*MADTInfo, madt_info_slice);
-    //logger.log("{x}\n", .{madt_info});
-
-    var madt_header: *MADTHeader = undefined;
-    var entry_data = data[@sizeOf(MADTInfo)..];
-    while (entry_data.len >= @sizeOf(MADTHeader)) : ({
-        entry_data = entry_data[madt_header.record_length..];
-    }) {
-        madt_header = @ptrCast(*MADTHeader, entry_data);
-        const typ = intToEnumSafe(MADTEntryType, madt_header.entry_type);
-        if (typ == null) continue;
-        const typ_enum = typ.?;
-        switch (typ_enum) {
-            .LocalApic => {
-                const lapic = @ptrCast(*MADTLapic, entry_data);
-                //logger.log("{}\n", .{lapic});
-            },
-            else => {
-                //logger.log("{}\n", .{typ});
-            },
-        }
-    }
 }
+
+pub const MADTIterator = struct {
+    data: []const u8,
+
+    pub fn next(self: *@This()) ?*const MADTHeader {
+        if (self.data.len >= @sizeOf(MADTHeader)) {
+            const madt_header = @ptrCast(*const MADTHeader, self.data.ptr);
+            self.data = self.data[madt_header.record_length..];
+            return madt_header;
+        }
+        return null;
+    }
+
+    pub fn empty() MADTIterator {
+        return .{ .data = &[_]u8{} };
+    }
+
+    pub fn init(header: *SDTHeader) MADTIterator {
+        const data_length = header.length - @sizeOf(SDTHeader);
+        var data = @intToPtr([*]u8, @ptrToInt(header) + @sizeOf(SDTHeader))[0..data_length];
+
+        var madt_info_slice = data[0..@sizeOf(MADTInfo)];
+
+        const madt_info: *MADTInfo = @ptrCast(*MADTInfo, madt_info_slice);
+        //logger.log("{x}\n", .{madt_info});
+
+        var madt_header: *MADTHeader = undefined;
+        var entry_data = data[@sizeOf(MADTInfo)..];
+
+        return .{ .data = entry_data };
+    }
+};
+
+pub fn iterMADT() MADTIterator {
+    if (getTable("APIC")) |table| {
+        return MADTIterator.init(table);
+    }
+    return MADTIterator.empty();
+}
+
 fn parse_hpet(header: *SDTHeader) void {
     logger.log("Parsing HPET\n", .{});
 }
 
-pub fn parse_table(addr: PhysicalAddress) void {
-    const header = mm.directMapping().to_virt(addr).into_pointer(*SDTHeader);
-    if (std.mem.eql(u8, header.signature[0..], "FACP")) {
-        parse_fadt(header);
-    } else if (std.mem.eql(u8, header.signature[0..], "MCFG")) {
-        parse_mcfg(header);
-    } else if (std.mem.eql(u8, header.signature[0..], "HPET")) {
-        parse_hpet(header);
-    } else if (std.mem.eql(u8, header.signature[0..], "APIC")) {
-        parse_apic(header);
-    } else {
-        logger.log("Unknown signature {e}\n", .{header.signature});
+const SDTIterator = struct {
+    data: []const u8,
+
+    pub fn next(self: *@This()) ?*SDTHeader {
+        const PointerType = u32;
+        const pointerSize = @sizeOf(PointerType);
+
+        if (self.data.len >= pointerSize) {
+            const addr = PhysicalAddress.new(std.mem.readIntSliceNative(
+                PointerType,
+                self.data[0..pointerSize],
+            ));
+            self.data = self.data[pointerSize..];
+            return mm.directMapping().to_virt(addr).into_pointer(*SDTHeader);
+        }
+        return null;
     }
+
+    pub fn init(rsdt: *SDTHeader) SDTIterator {
+        return .{ .data = @ptrCast([*]u8, rsdt)[@sizeOf(SDTHeader)..rsdt.length] };
+    }
+};
+
+pub fn iterSDT() SDTIterator {
+    return SDTIterator.init(rsdt_root);
 }
 
-fn parse_rsdt(rsdt: *SDTHeader) void {
-    var ptr_slice = @ptrCast([*]u8, rsdt)[@sizeOf(SDTHeader)..rsdt.length];
-
-    const PointerType = u32;
-    const pointerSize = @sizeOf(PointerType);
-
-    while (ptr_slice.len >= pointerSize) : (ptr_slice = ptr_slice[pointerSize..]) {
-        const addr = PhysicalAddress.new(std.mem.readIntSliceNative(
-            PointerType,
-            ptr_slice[0..pointerSize],
-        ));
-        parse_table(addr);
+pub fn getTable(name: []const u8) ?*SDTHeader {
+    var sdt_it = iterSDT();
+    while (sdt_it.next()) |table| {
+        if (std.mem.eql(u8, name, &table.signature)) {
+            return table;
+        }
     }
+    return null;
 }
+
+var rsdt_root: *SDTHeader = undefined;
 
 pub fn init() void {
     logger.log("Initializing ACPI\n", .{});
@@ -336,6 +340,10 @@ pub fn init() void {
         return;
     }
     logger.log("Valid RSDP found\n", .{});
-    const rsdt = mm.directMapping().to_virt(rsdp.?.get_rsdt()).into_pointer(*SDTHeader);
-    parse_rsdt(rsdt);
+    rsdt_root = mm.directMapping().to_virt(rsdp.?.get_rsdt()).into_pointer(*SDTHeader);
+
+    var sdt_it = iterSDT();
+    while (sdt_it.next()) |table| {
+        logger.info("Found table {e}\n", .{table.signature});
+    }
 }

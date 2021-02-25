@@ -5,6 +5,7 @@ const x86 = @import("../x86.zig");
 const apic = x86.apic;
 const elf = kernel.lib.elf;
 const MMIORegion = kernel.mmio.DynamicMMIORegion;
+const lib = kernel.lib;
 
 var logger = @TypeOf(x86.logger).childOf(@typeName(@This())){};
 
@@ -156,6 +157,34 @@ fn wakeUpCpu(lapic: *const MMIORegion, lapic_id: u8, start_page: u8) void {
     apic.sendCommand(lapic, lapic_id, command);
 }
 
+const LapicIterator = struct {
+    madt_it: x86.acpi.MADTIterator,
+
+    pub fn next(self: *@This()) ?*const x86.acpi.MADTLapic {
+        if (self.madt_it.next()) |header| {
+            const typ = lib.intToEnumSafe(x86.acpi.MADTEntryType, header.entry_type);
+            if (typ == null) return self.next();
+            const typ_enum = typ.?;
+            switch (typ_enum) {
+                .LocalApic => {
+                    return @ptrCast(*const x86.acpi.MADTLapic, header);
+                },
+                else => return null,
+            }
+        }
+        return null;
+    }
+
+    pub fn init(madt_it: x86.acpi.MADTIterator) LapicIterator {
+        return .{ .madt_it = madt_it };
+    }
+};
+
+fn iterLapic() LapicIterator {
+    var it = x86.acpi.iterMADT();
+    return LapicIterator.init(it);
+}
+
 pub fn init() void {
     //logger.setLevel(@TypeOf(logger).Level.Debug);
     //defer logger.setLevel(@TypeOf(logger).Level.Info);
@@ -186,12 +215,12 @@ pub fn init() void {
     logger.log("Performing AP startup code relocation\n", .{});
     try relocateStartupCode(buffer);
 
-    for ([_]u8{
-        1,
-    }) |target| {
-        logger.info("Waking CPU {}\n", .{target});
-        wakeUpCpu(&apic.lapic, target, start_page);
+    var it = iterLapic();
+    const apic_id = x86.apic.getLapicId();
+    while (it.next()) |lapic| {
+        if (apic_id != lapic.acpi_processor_uid) {
+            logger.info("Waking CPU on APIC {}\n", .{lapic.acpi_processor_uid});
+            //wakeUpCpu(&apic.lapic, lapic.acpi_processor_uid, start_page);
+        }
     }
-
-    x86.idle();
 }
