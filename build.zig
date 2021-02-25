@@ -7,6 +7,7 @@ const CpuFeature = std.Target.Cpu.Feature;
 
 fn build_x86_64(kernel: *std.build.LibExeObjStep) void {
     const builder = kernel.builder;
+    var kernel_tls = builder.step("kernel", "Build kernel ELF");
 
     const cross_target = CrossTarget{
         .cpu_arch = Arch.x86_64,
@@ -36,6 +37,8 @@ fn build_x86_64(kernel: *std.build.LibExeObjStep) void {
     kernel.setLinkerScriptPath("kernel/arch/x86/linker.ld");
     kernel.addAssemblyFile("kernel/arch/x86/boot.S");
     kernel.setOutputDir("build/x86_64");
+
+    kernel_tls.dependOn(&kernel.step);
 
     const trampolines = builder.addAssemble("trampolines", "kernel/arch/x86/trampolines.S");
     trampolines.setOutputDir("build/x86_64");
