@@ -11,7 +11,7 @@ pub const SpinLock = struct {
     pub const Held = struct {
         spinlock: *SpinLock,
 
-        pub fn release(self: Held) void {
+        pub fn release(self: Held) callconv(.Inline) void {
             @atomicStore(State, &self.spinlock.state, .Unlocked, .Release);
         }
     };

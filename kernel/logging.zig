@@ -12,7 +12,7 @@ pub fn register_sink(sink: *SinkNode) void {
     printk_sinks.prepend(sink);
 }
 
-var printk_spinlock = kernel.lib.spinlock.SpinLock.init();
+var printk_spinlock = kernel.lib.SpinLock.init();
 
 fn do_printk(buffer: []const u8) void {
     var sink = printk_sinks.first;

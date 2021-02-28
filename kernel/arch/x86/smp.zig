@@ -34,9 +34,11 @@ fn patchCr3Value(buffer: []u8, offset: u64) void {
 
 var ap_boot_stack: [0x1000]u8 = undefined;
 
+var startup_lock = kernel.lib.SpinLock.init();
+var ap_booted: bool = false;
+
 fn apEntry() callconv(.C) noreturn {
     const apic_id = x86.apic.getLapicId();
-    logger.log("LAPIC ID {x} CPU up\n", .{apic_id});
 
     x86.main_gdt.load();
     x86.set_ds(x86.null_entry.raw);
@@ -49,9 +51,13 @@ fn apEntry() callconv(.C) noreturn {
     x86.main_idt.load();
     //GSBASE.write(@ptrToInt(&boot_cpu_gsstruct));
 
-    logger.log("CPU{} idling\n", .{apic_id});
-    x86.idle();
-    while (true) {}
+    {
+        const held = startup_lock.acquire();
+        defer held.release();
+
+        ap_booted = true;
+    }
+    x86.hang();
 }
 
 fn patchEntrypoint(buffer: []u8, offset: u64) void {
@@ -218,9 +224,19 @@ pub fn init() void {
     var it = iterLapic();
     const apic_id = x86.apic.getLapicId();
     while (it.next()) |lapic| {
+        {
+            const held = startup_lock.acquire();
+            defer held.release();
+            ap_booted = false;
+        }
         if (apic_id != lapic.acpi_processor_uid) {
-            logger.info("Waking CPU on APIC {}\n", .{lapic.acpi_processor_uid});
-            //wakeUpCpu(&apic.lapic, lapic.acpi_processor_uid, start_page);
+            wakeUpCpu(&apic.lapic, lapic.acpi_processor_uid, start_page);
+            while (true) {
+                const held = startup_lock.acquire();
+                defer held.release();
+                if (ap_booted) break;
+            }
+            logger.info("CPU{} up\n", .{lapic.acpi_processor_uid});
         }
     }
 }

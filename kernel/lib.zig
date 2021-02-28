@@ -1,6 +1,6 @@
 const std = @import("std");
 pub const elf = @import("lib/elf.zig");
-pub const spinlock = @import("lib/spinlock.zig");
+pub const SpinLock = @import("lib/spinlock.zig").SpinLock;
 
 pub fn intToEnumSafe(comptime T: type, value: std.meta.Tag(T)) ?T {
     const enumInfo = switch (@typeInfo(T)) {
