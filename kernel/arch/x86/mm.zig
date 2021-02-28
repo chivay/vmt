@@ -144,6 +144,7 @@ pub const VirtualMemoryImpl = struct {
         InvalidSize,
         UnalignedAddress,
         MappingExists,
+        MappingNotExists,
     };
 
     pub fn init(frame_allocator: *mm.FrameAllocator) !VirtualMemoryImpl {
@@ -206,6 +207,27 @@ pub const VirtualMemoryImpl = struct {
         pt.set_entry(pt_index, what.value | flags);
     }
 
+    fn unmap_page_4kb(self: Self, where: VirtualAddress) !PhysicalAddress {
+        if (!where.isAligned(mm.KiB(4))) {
+            return Error.UnalignedAddress;
+        }
+
+        const pml4_index = get_pml4_slot(where);
+        const pdpt_index = get_pdpt_slot(where);
+        const pd_index = get_pd_slot(where);
+        const pt_index = get_pt_slot(where);
+
+        const pdpt = self.pml4.get_pdp(self.allocator, pml4_index) orelse return Error.MappingNotExists;
+        const pd = pdpt.get_pd(self.allocator, pdpt_index) orelse return Error.MappingNotExists;
+        const pt = pd.get_pt(self.allocator, pdpt_index) orelse return Error.MappingNotExists;
+
+        if (pt.get_page(pt_index)) |page| {
+            pt.set_entry(pt_index, 0);
+            return page;
+        }
+        return Error.MappingNotExists;
+    }
+
     fn map_page_2mb(
         self: Self,
         where: VirtualAddress,
@@ -247,6 +269,25 @@ pub const VirtualMemoryImpl = struct {
         flags |= PD.PRESENT.v() | PD.PAGE_2M.v();
 
         pd.set_entry(pd_index, what.value | flags);
+    }
+
+    fn unmap_page_2mb(where: PhysicalAddress) !PhysicalAddress {
+        if (!where.isAligned(mm.KiB(2))) {
+            return Error.UnalignedAddress;
+        }
+
+        const pml4_index = get_pml4_slot(where);
+        const pdpt_index = get_pdpt_slot(where);
+        const pd_index = get_pd_slot(where);
+
+        const pdpt = self.pml4.get_pdp(self.allocator, pml4_index) orelse return Error.MappingNotExists;
+        const pd = pdpt.get_pd(self.allocator, pdpt_index) orelse return Error.MappingNotExists;
+
+        if (pd.get_page_2m(pd_index)) |phys| {
+            pd.set_entry(pd_index, 0);
+            return phys;
+        }
+        return Error.MappingNotExists;
     }
 
     pub fn map_addr(
