@@ -34,7 +34,7 @@ fn patchCr3Value(buffer: []u8, offset: u64) void {
 
 var ap_boot_stack: [0x1000]u8 = undefined;
 
-var startup_lock = kernel.lib.SpinLock.init();
+var startup_lock = kernel.lib.Spinlock.init();
 var ap_booted: bool = false;
 
 fn waitUntilBooted() void {
