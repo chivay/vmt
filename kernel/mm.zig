@@ -228,6 +228,10 @@ pub const VirtualMemory = struct {
         return self.vm_impl.map_io(what, length);
     }
 
+    pub fn unmap(self: Self, range: VirtualMemoryRange) !void {
+        return self.vm_impl.unmap(range);
+    }
+
     pub fn switch_to(self: Self) void {
         self.vm_impl.switch_to();
     }

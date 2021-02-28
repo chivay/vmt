@@ -380,6 +380,71 @@ pub const VirtualMemoryImpl = struct {
         self.dynamic_next = self.dynamic_next.add(range.size);
         return range;
     }
+
+    fn get_page_kind(self: *const Self, where: VirtualAddress) ?PageKind {
+        const pml4_index = get_pml4_slot(where);
+        const pdpt_index = get_pdpt_slot(where);
+        const pd_index = get_pd_slot(where);
+        const pt_index = get_pt_slot(where);
+
+        const pdpt = self.pml4.get_pdpt(pml4_index) orelse return null;
+        switch (pdpt.get_entry_kind(pdpt_index)) {
+            .Missing => return null,
+            .Page1G => return .Page1G,
+            .PD => {
+                const pd = pdpt.get_pd(pdpt_index) orelse return null;
+                switch (pd.get_entry_kind(pd_index)) {
+                    .Missing => return null,
+                    .Page2M => return .Page2M,
+                    .PageTable => {
+                        const pt = pd.get_pt(pd_index) orelse return null;
+                        switch (pt.get_entry_kind(pt_index)) {
+                            .Page4K => return .Page4K,
+                            .Missing => return null,
+                        }
+                    },
+                }
+            },
+        }
+        return null;
+    }
+
+    pub fn unmap(self: *Self, range: mm.VirtualMemoryRange) !void {
+        logger.setLevel(.Debug);
+        defer logger.setLevel(.Info);
+
+        var left = range;
+        while (left.size > mm.KiB(4)) {
+            const kind = self.get_page_kind(left.base) orelse {
+                logger.err("Tried to unmap page at {}, but there's none\n", left.base);
+                return Error.MappingNotExists;
+            };
+            switch (kind) {
+                .Page4K => {
+                    if (!left.base.isAligned(mm.KiB(4))) {
+                        left.base.value = std.mem.alignBackward(left.base.value, mm.KiB(4));
+                    }
+                    const page = self.unmap_page_4kb(left.base) catch |err| {
+                        logger.err("Failed to unmap 4KiB page at {}\n", left.base);
+                        return err;
+                    };
+                    left.base = left.base.add(mm.KiB(4));
+                },
+                .Page2M => {
+                    if (!left.base.isAligned(mm.MiB(2))) {
+                        left.base.value = std.mem.alignBackward(left.base.value, mm.MiB(2));
+                    }
+                    const page = self.unmap_page_2mb(left.base) catch |err| {
+                        logger.err("Failed to unmap 2MiB page at {}\n", left.base);
+                        return err;
+                    };
+                    left.base = left.base.add(mm.MiB(2));
+                },
+                .Page1G => @panic("Unimplemented"),
+            }
+        }
+        flushTlb();
+    }
 };
 
 pub var kernel_vm_impl: VirtualMemoryImpl = undefined;
