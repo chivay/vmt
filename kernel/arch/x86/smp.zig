@@ -117,7 +117,7 @@ fn patchSectionRel(buffer: []u8, offset: u64, addend: i64, typ: RelocType) void 
     }
 }
 
-fn relocateStartupCode(buffer: []u8) !void {
+fn relocateStartupCode(buffer: []u8) void {
     var relocations = x86.trampoline.getSectionData(".rela.smp_trampoline").?;
     while (relocations.len > 0) : (relocations = relocations[@sizeOf(elf.Elf64_Rela)..]) {
         var rela: elf.Elf64_Rela = undefined;
@@ -227,7 +227,7 @@ pub fn init() void {
     std.mem.copy(u8, buffer, startup_code);
 
     logger.log("Performing AP startup code relocation\n", .{});
-    try relocateStartupCode(buffer);
+    relocateStartupCode(buffer);
 
     var it = iterLapic();
     const apic_id = x86.apic.getLapicId();
