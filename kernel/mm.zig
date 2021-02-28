@@ -220,8 +220,8 @@ pub const VirtualMemory = struct {
         return .{ .vm_impl = vm_impl };
     }
 
-    pub fn map_memory(self: Self, where: VirtualAddress, what: PhysicalAddress, length: usize) !void {
-        _ = try self.vm_impl.map_memory(where, what, length);
+    pub fn map_memory(self: Self, where: VirtualAddress, what: PhysicalAddress, length: usize) !VirtualMemoryRange {
+        return self.vm_impl.map_memory(where, what, length);
     }
 
     pub fn map_io(self: Self, what: PhysicalAddress, length: usize) !VirtualMemoryRange {

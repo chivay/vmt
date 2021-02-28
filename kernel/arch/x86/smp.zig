@@ -200,30 +200,30 @@ fn iterLapic() LapicIterator {
 }
 
 pub fn init() void {
-    //logger.setLevel(@TypeOf(logger).Level.Debug);
-    //defer logger.setLevel(@TypeOf(logger).Level.Info);
     const PAGE_SIZE = 0x1000;
 
     const phys_start = try allocateTrampoline();
     const start_page: u8 = @truncate(u8, (phys_start.value / PAGE_SIZE));
 
-    mm.kernel_vm.map_memory(
-        mm.VirtualAddress.new(TRAMPOLINE_BASE),
+    const virt_start = mm.VirtualAddress.new(TRAMPOLINE_BASE);
+    const trampoline = mm.kernel_vm.map_memory(
+        virt_start,
         phys_start,
         PAGE_SIZE,
     ) catch |err| {
         logger.err("Failed to map AP memory");
         return;
     };
-
-    const trampoline = mm.kernel_vm.map_io(phys_start, PAGE_SIZE) catch |err| {
-        logger.err("Failed to map trampoline memory");
-        return;
+    defer mm.kernel_vm.unmap(trampoline) catch |err| {
+        @panic("Failed to unmap AP memory");
     };
 
     const startup_code = x86.trampoline.getSectionData(".smp_trampoline").?;
 
     const buffer = trampoline.as_bytes()[0..startup_code.len];
+    if (startup_code.len > buffer.len) {
+        @panic("Trampoline size more than one page long!");
+    }
     std.mem.copy(u8, buffer, startup_code);
 
     logger.log("Performing AP startup code relocation\n", .{});

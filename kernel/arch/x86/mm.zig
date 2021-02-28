@@ -456,7 +456,7 @@ fn setup_kernel_vm() !void {
     // Initial 1GiB mapping
     logger.debug("Identity mapping 1GiB from 0 phys\n", .{});
     const initial_mapping_size = mm.GiB(1);
-    try mm.kernel_vm.map_memory(
+    _ = try mm.kernel_vm.map_memory(
         DIRECT_MAPPING.base,
         PhysicalAddress.new(0x0),
         initial_mapping_size,
@@ -466,7 +466,7 @@ fn setup_kernel_vm() !void {
     logger.debug("Mapping kernel image\n", .{});
     const kern_end = VirtualAddress.new(@ptrToInt(&kernel_end));
     const kernel_size = VirtualAddress.span(KERNEL_IMAGE.base, kern_end);
-    mm.kernel_vm.map_memory(
+    _ = mm.kernel_vm.map_memory(
         KERNEL_IMAGE.base,
         PhysicalAddress.new(0),
         std.mem.alignForward(kernel_size, mm.MiB(2)),
@@ -486,7 +486,7 @@ fn setup_kernel_vm() !void {
     kernel.mm.dump_vm_mappings(&mm.kernel_vm);
 
     logger.debug("Mapping rest of direct memory\n", .{});
-    try mm.kernel_vm.map_memory(
+    _ = try mm.kernel_vm.map_memory(
         DIRECT_MAPPING.base.add(initial_mapping_size),
         PhysicalAddress.new(0 + initial_mapping_size),
         mm.GiB(63),
