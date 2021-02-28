@@ -11,25 +11,25 @@ const VirtualAddress = mm.VirtualAddress;
 
 const mask: u64 = ~@as(u64, 0xfff);
 
-pub fn get_pml4_slot(addr: VirtualAddress) PML4.IdxType {
+pub fn get_pml4_slot(addr: VirtualAddress) callconv(.Inline) PML4.IdxType {
     const pml4_index_ = (addr.value >> 39) & 0x1ff;
     std.debug.assert(pml4_index_ <= PML4.MaxIndex);
     return @intCast(PML4.IdxType, pml4_index_);
 }
 
-pub fn get_pdpt_slot(addr: VirtualAddress) PDPT.IdxType {
+pub fn get_pdpt_slot(addr: VirtualAddress) callconv(.Inline) PDPT.IdxType {
     const pdpt_index = (addr.value >> 30) & 0x1ff;
     std.debug.assert(pdpt_index <= PDPT.MaxIndex);
     return @intCast(PDPT.IdxType, pdpt_index);
 }
 
-pub fn get_pd_slot(addr: VirtualAddress) PD.IdxType {
+pub fn get_pd_slot(addr: VirtualAddress) callconv(.Inline) PD.IdxType {
     const pd_index = (addr.value >> 21) & 0x1ff;
     std.debug.assert(pd_index <= PD.MaxIndex);
     return @intCast(PD.IdxType, pd_index);
 }
 
-pub fn get_pt_slot(addr: VirtualAddress) PT.IdxType {
+pub fn get_pt_slot(addr: VirtualAddress) callconv(.Inline) PT.IdxType {
     const pt_index = (addr.value >> 12) & 0x1ff;
     std.debug.assert(pt_index <= PT.MaxIndex);
     return @intCast(PT.IdxType, pt_index);
