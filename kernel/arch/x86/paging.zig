@@ -164,6 +164,10 @@ pub const PD = struct {
         PageTable,
     };
 
+    pub fn to_2mb_pfn(entry: EntryType) u64 {
+        return (x86.get_phy_mask() >> 21) & (entry >> 21);
+    }
+
     fn get_table(self: Self) *TableFormat {
         return self.phys2virt(self.root).into_pointer(*TableFormat);
     }
@@ -192,7 +196,9 @@ pub const PD = struct {
         const entry = self.get_table()[idx];
 
         if (bit_set(entry, PRESENT) and bit_set(entry, PAGE_2M)) {
-            return PhysicalAddress.new(entry & mask);
+            // physical address mask - low 20 bits
+            const addr_bits = x86.get_phy_mask() ^ ((1 << 21) - 1);
+            return PhysicalAddress.new(entry & addr_bits);
         }
         return null;
     }
@@ -268,6 +274,24 @@ pub const PDPT = struct {
 
     const Self = @This();
 
+    pub const EntryKind = enum {
+        Missing,
+        PD,
+        Page1G,
+    };
+
+    pub fn get_entry_kind(self: Self, idx: IdxType) EntryKind {
+        const entry = self.get_table()[idx];
+        const is_present = bit_set(entry, PRESENT);
+
+        if (is_present and bit_set(entry, PAGE_1G)) {
+            return EntryKind.Page1G;
+        } else if (is_present) {
+            return EntryKind.PD;
+        }
+        return EntryKind.Missing;
+    }
+
     fn get_table(self: Self) *TableFormat {
         return self.phys2virt(self.root).into_pointer(*TableFormat);
     }
@@ -342,8 +366,23 @@ pub const PML4 = struct {
 
     const Self = @This();
 
+    pub const EntryKind = enum {
+        Missing,
+        PDPT,
+    };
+
     pub fn init(pml4: PhysicalAddress, base: ?VirtualAddress) PML4 {
         return .{ .root = pml4, .base = base };
+    }
+
+    pub fn get_entry_kind(self: Self, idx: IdxType) EntryKind {
+        const entry = self.get_table()[idx];
+        const is_present = bit_set(entry, PRESENT);
+
+        if (is_present) {
+            return EntryKind.PDPT;
+        }
+        return EntryKind.Missing;
     }
 
     fn get_table(self: Self) *TableFormat {
@@ -365,7 +404,7 @@ pub const PML4 = struct {
         return VirtualAddress.new(offset);
     }
 
-    pub fn get_pdp(self: @This(), idx: IdxType) ?PDPT {
+    pub fn get_pdpt(self: @This(), idx: IdxType) ?PDPT {
         const entry = self.get_entry(idx);
         if (bit_set(entry, PRESENT)) {
             const virt_base = self.get_virt_base(idx);
@@ -374,13 +413,13 @@ pub const PML4 = struct {
         return null;
     }
 
-    pub fn get_pdp_alloc(self: @This(), allocator: *mm.FrameAllocator, idx: IdxType) !PDPT {
-        if (self.get_pdp(idx) == null) {
+    pub fn get_pdpt_alloc(self: @This(), allocator: *mm.FrameAllocator, idx: IdxType) !PDPT {
+        if (self.get_pdpt(idx) == null) {
             const frame = try allocator.alloc_zero_frame();
             const v = frame.value | PML4.WRITABLE.v() | PML4.PRESENT.v();
             self.set_entry(idx, v);
         }
-        return self.get_pdp(idx).?;
+        return self.get_pdpt(idx).?;
     }
 
     pub fn get_entry(self: @This(), idx: IdxType) EntryType {
@@ -394,7 +433,7 @@ pub const PML4 = struct {
     pub fn walk(self: Self, comptime T: type, context: *T) void {
         var i: PML4.IdxType = 0;
         while (true) : (i += 1) {
-            const pdp = self.get_pdp(i);
+            const pdp = self.get_pdpt(i);
             if (pdp) |entry| {
                 entry.walk(T, context);
             }

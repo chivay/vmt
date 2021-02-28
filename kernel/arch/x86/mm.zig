@@ -181,7 +181,7 @@ pub const VirtualMemoryImpl = struct {
         const pd_index = get_pd_slot(where);
         const pt_index = get_pt_slot(where);
 
-        const pdpt = try self.pml4.get_pdp_alloc(self.allocator, pml4_index);
+        const pdpt = try self.pml4.get_pdpt_alloc(self.allocator, pml4_index);
         const pd = try pdpt.get_pd_alloc(self.allocator, pdpt_index);
         const pt = try pd.get_pt_alloc(self.allocator, pdpt_index);
 
@@ -217,9 +217,9 @@ pub const VirtualMemoryImpl = struct {
         const pd_index = get_pd_slot(where);
         const pt_index = get_pt_slot(where);
 
-        const pdpt = self.pml4.get_pdp(self.allocator, pml4_index) orelse return Error.MappingNotExists;
-        const pd = pdpt.get_pd(self.allocator, pdpt_index) orelse return Error.MappingNotExists;
-        const pt = pd.get_pt(self.allocator, pdpt_index) orelse return Error.MappingNotExists;
+        const pdpt = self.pml4.get_pdpt(pml4_index) orelse return Error.MappingNotExists;
+        const pd = pdpt.get_pd(pdpt_index) orelse return Error.MappingNotExists;
+        const pt = pd.get_pt(pdpt_index) orelse return Error.MappingNotExists;
 
         if (pt.get_page(pt_index)) |page| {
             pt.set_entry(pt_index, 0);
@@ -242,7 +242,7 @@ pub const VirtualMemoryImpl = struct {
         const pdpt_index = get_pdpt_slot(where);
         const pd_index = get_pd_slot(where);
 
-        const pdpt = try self.pml4.get_pdp_alloc(self.allocator, pml4_index);
+        const pdpt = try self.pml4.get_pdpt_alloc(self.allocator, pml4_index);
         const pd = try pdpt.get_pd_alloc(self.allocator, pdpt_index);
 
         if (pd.get_entry_kind(pd_index) != PD.EntryKind.Missing) {
@@ -271,8 +271,8 @@ pub const VirtualMemoryImpl = struct {
         pd.set_entry(pd_index, what.value | flags);
     }
 
-    fn unmap_page_2mb(where: PhysicalAddress) !PhysicalAddress {
-        if (!where.isAligned(mm.KiB(2))) {
+    fn unmap_page_2mb(self: *Self, where: VirtualAddress) !PhysicalAddress {
+        if (!where.isAligned(mm.MiB(2))) {
             return Error.UnalignedAddress;
         }
 
@@ -280,8 +280,8 @@ pub const VirtualMemoryImpl = struct {
         const pdpt_index = get_pdpt_slot(where);
         const pd_index = get_pd_slot(where);
 
-        const pdpt = self.pml4.get_pdp(self.allocator, pml4_index) orelse return Error.MappingNotExists;
-        const pd = pdpt.get_pd(self.allocator, pdpt_index) orelse return Error.MappingNotExists;
+        const pdpt = self.pml4.get_pdpt(pml4_index) orelse return Error.MappingNotExists;
+        const pd = pdpt.get_pd(pdpt_index) orelse return Error.MappingNotExists;
 
         if (pd.get_page_2m(pd_index)) |phys| {
             pd.set_entry(pd_index, 0);
