@@ -62,6 +62,10 @@ pub const PT = struct {
 
     const Self = @This();
 
+    pub fn to_pfn(entry: EntryType) u64 {
+        return (x86.get_phy_mask() >> 12) & (entry >> 12);
+    }
+
     fn get_table(self: Self) *TableFormat {
         return self.phys2virt(self.root).into_pointer(*TableFormat);
     }

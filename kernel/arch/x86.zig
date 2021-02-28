@@ -25,6 +25,13 @@ pub var main_gdt align(64) = GDT.new();
 pub var main_tss align(64) = std.mem.zeroes(TSS);
 pub var main_idt align(64) = std.mem.zeroes(IDT);
 
+/// Physical-address width supported by the processor. <= 52
+pub var cpu_phys_bits: u8 = undefined;
+
+pub fn get_phy_mask() callconv(.Inline) u64 {
+    return (1 << cpu_phys_bits) - 1;
+}
+
 pub const TaskRegs = packed struct {
     // Layout must be kept in sync with asm_switch_stack
     rsp: u64,
@@ -244,6 +251,10 @@ pub fn get_vendor_string() [12]u8 {
     return result;
 }
 
+pub fn get_maxphyaddr() u8 {
+    const info = cpuid(0x80000008, 0);
+    return @truncate(u8, info.eax);
+}
 pub fn hang() noreturn {
     while (true) {
         cli();
@@ -546,6 +557,8 @@ pub fn init_cpu() !void {
 }
 
 pub fn init() void {
+    cpu_phys_bits = get_maxphyaddr();
+
     trampoline.init();
     acpi.init();
     apic.init();
