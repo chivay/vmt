@@ -56,6 +56,7 @@ fn build_x86_64(kernel: *std.build.LibExeObjStep) void {
         "-enable-kvm",
         "-cdrom",
         "build/x86_64/kernel.iso",
+        "-s",
         "-serial",
         "stdio",
         "-display",
