@@ -518,6 +518,7 @@ pub var user_code: SegmentSelector = undefined;
 pub var user_data: SegmentSelector = undefined;
 
 pub fn init_cpu() !void {
+    cpu_phys_bits = get_maxphyaddr();
     const Entry = GDT.Entry;
 
     null_entry = main_gdt.add_entry(Entry.nil);
@@ -558,8 +559,6 @@ pub fn init_cpu() !void {
 }
 
 pub fn init() void {
-    cpu_phys_bits = get_maxphyaddr();
-
     trampoline.init();
     acpi.init();
     apic.init();
