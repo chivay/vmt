@@ -37,6 +37,14 @@ var ap_boot_stack: [0x1000]u8 = undefined;
 var startup_lock = kernel.lib.SpinLock.init();
 var ap_booted: bool = false;
 
+fn waitUntilBooted() void {
+    while (true) {
+        const held = startup_lock.acquire();
+        defer held.release();
+        if (ap_booted) break;
+    }
+}
+
 fn apEntry() callconv(.C) noreturn {
     const apic_id = x86.apic.getLapicId();
 
@@ -231,11 +239,7 @@ pub fn init() void {
         }
         if (apic_id != lapic.acpi_processor_uid) {
             wakeUpCpu(&apic.lapic, lapic.acpi_processor_uid, start_page);
-            while (true) {
-                const held = startup_lock.acquire();
-                defer held.release();
-                if (ap_booted) break;
-            }
+            waitUntilBooted();
             logger.info("CPU{} up\n", .{lapic.acpi_processor_uid});
         }
     }
