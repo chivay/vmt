@@ -35,6 +35,10 @@ pub fn get_pt_slot(addr: VirtualAddress) callconv(.Inline) PT.IdxType {
     return @intCast(PT.IdxType, pt_index);
 }
 
+pub fn flushTlb() void {
+    x86.CR3.write(x86.CR3.read());
+}
+
 pub const PT = struct {
     root: PhysicalAddress,
     base: ?VirtualAddress,
