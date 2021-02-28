@@ -26,10 +26,11 @@ pub var main_tss align(64) = std.mem.zeroes(TSS);
 pub var main_idt align(64) = std.mem.zeroes(IDT);
 
 /// Physical-address width supported by the processor. <= 52
-pub var cpu_phys_bits: u8 = undefined;
+pub var cpu_phys_bits: u6 = undefined;
 
 pub fn get_phy_mask() callconv(.Inline) u64 {
-    return (1 << cpu_phys_bits) - 1;
+    const one: u64 = 1;
+    return @shlExact(one, cpu_phys_bits) - 1;
 }
 
 pub const TaskRegs = packed struct {
@@ -251,9 +252,9 @@ pub fn get_vendor_string() [12]u8 {
     return result;
 }
 
-pub fn get_maxphyaddr() u8 {
+pub fn get_maxphyaddr() u6 {
     const info = cpuid(0x80000008, 0);
-    return @truncate(u8, info.eax);
+    return @truncate(u6, info.eax);
 }
 pub fn hang() noreturn {
     while (true) {
