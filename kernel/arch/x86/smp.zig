@@ -118,7 +118,7 @@ fn relocateStartupCode(buffer: []u8) !void {
 
         const eql = std.mem.eql;
 
-        logger.log("{} of symbol {e} at {}\n", .{ typ, name, rela.r_offset });
+        logger.debug("{} of symbol {e} at {}\n", .{ typ, name, rela.r_offset });
         if (has_name and eql(u8, name.?, "KERNEL_CR3") and typ == .R_AMD64_32) {
             patchCr3Value(buffer, offset);
         } else if (has_name and eql(u8, name.?, "STACK") and typ == .R_AMD64_64) {

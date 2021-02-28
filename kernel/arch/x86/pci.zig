@@ -45,7 +45,7 @@ fn enumerate_pci_devices() void {
 
 pub fn init() void {
     logger.log("Initializing PCI\n", .{});
-    if (x86.acpi.mcfg_entry) |entry| {
+    if (x86.acpi.iterMCFG().next()) |entry| {
         mmio_base = PhysicalAddress.new(entry.base_address);
         enumerate_pci_devices();
     } else {

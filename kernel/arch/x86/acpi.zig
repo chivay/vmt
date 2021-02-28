@@ -171,12 +171,6 @@ pub fn hexdump(bytes: []const u8) void {
     logger.log("{x}\n", .{bytes});
 }
 
-fn parse_fadt(header: *SDTHeader) void {
-    logger.log("Parsing FADT\n", .{});
-    const data = @intToPtr(*FADTData, @ptrToInt(header) + @sizeOf(SDTHeader));
-    //logger.log("{x}\n", .{data});
-}
-
 const MCFGEntry = packed struct {
     base_address: u64,
     pci_segment_group: u16,
@@ -190,18 +184,26 @@ fn mmio_read(comptime T: type, addr: PhysicalAddress) T {
     return mmio_addr.*;
 }
 
-pub var mcfg_entry: ?*MCFGEntry = null;
+pub const MCFGIterator = struct {
+    data: []const u8,
 
-fn parse_mcfg(header: *SDTHeader) void {
-    logger.log("Parsing MCFG\n", .{});
-    // 8 bytes of reserved field
-    const data_length = header.length - @sizeOf(SDTHeader) - 8;
-    var data = @intToPtr([*]u8, @ptrToInt(header) + @sizeOf(SDTHeader) + 8)[0..data_length];
-    while (data.len >= @sizeOf(MCFGEntry)) : (data = data[@sizeOf(MCFGEntry)..]) {
-        const entry = @ptrCast(*MCFGEntry, data);
-        mcfg_entry = entry;
+    pub fn empty() MCFGIterator {
+        return .{ .data = &[_]u8{} };
     }
-}
+
+    pub fn next(self: *@This()) ?*const MCFGEntry {
+        if (self.data.len < @sizeOf(MCFGEntry)) return null;
+        const entry = @ptrCast(*const MCFGEntry, self.data);
+        self.data = self.data[@sizeOf(MCFGEntry)..];
+        return entry;
+    }
+
+    pub fn init(header: *SDTHeader) MCFGIterator {
+        const data_length = header.length - @sizeOf(SDTHeader) - 8;
+        var data = @intToPtr([*]u8, @ptrToInt(header) + @sizeOf(SDTHeader) + 8)[0..data_length];
+        return .{ .data = data };
+    }
+};
 
 pub const MADTLapicEntry = packed struct {
     madt_header: MADTHeader,
@@ -244,11 +246,6 @@ pub const MADTLapic = packed struct {
     flags: u32,
 };
 
-fn parse_apic(header: *SDTHeader) void {
-    logger.log("Parsing MADT\n", .{});
-    //logger.log("{}\n", .{header});
-}
-
 pub const MADTIterator = struct {
     data: []const u8,
 
@@ -288,8 +285,11 @@ pub fn iterMADT() MADTIterator {
     return MADTIterator.empty();
 }
 
-fn parse_hpet(header: *SDTHeader) void {
-    logger.log("Parsing HPET\n", .{});
+pub fn iterMCFG() MCFGIterator {
+    if (getTable("MCFG")) |table| {
+        return MCFGIterator.init(table);
+    }
+    return MCFGIterator.empty();
 }
 
 const SDTIterator = struct {
