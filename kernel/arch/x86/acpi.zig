@@ -167,10 +167,6 @@ fn find_rsdp() ?*RSDP {
     return null;
 }
 
-pub fn hexdump(bytes: []const u8) void {
-    logger.log("{x}\n", .{bytes});
-}
-
 const MCFGEntry = packed struct {
     base_address: u64,
     pci_segment_group: u16,
@@ -178,11 +174,6 @@ const MCFGEntry = packed struct {
     end_bus: u8,
     reserved: u32,
 };
-
-fn mmio_read(comptime T: type, addr: PhysicalAddress) T {
-    const mmio_addr = @ptrCast(*volatile T, addr.value);
-    return mmio_addr.*;
-}
 
 pub const MCFGIterator = struct {
     data: []const u8,
