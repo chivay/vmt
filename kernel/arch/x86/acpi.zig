@@ -335,6 +335,6 @@ pub fn init() void {
 
     var sdt_it = iterSDT();
     while (sdt_it.next()) |table| {
-        logger.info("Found table {e}\n", .{table.signature});
+        logger.info("Found table {e}\n", .{std.fmt.fmtSliceEscapeLower(&table.signature)});
     }
 }

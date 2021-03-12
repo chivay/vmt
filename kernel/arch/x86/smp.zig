@@ -132,7 +132,11 @@ fn relocateStartupCode(buffer: []u8) void {
 
         const eql = std.mem.eql;
 
-        logger.debug("{} of symbol {e} at {}\n", .{ typ, name, rela.r_offset });
+        // zig bug variable has to be hoiseted outside {}
+        // https://github.com/ziglang/zig/issues/7467
+        const escaped_name = if (name) |nam| std.fmt.fmtSliceEscapeLower(nam) else std.fmt.fmtSliceEscapeLower("(null)");
+
+        logger.debug("{} of symbol {} at {}\n", .{ typ, escaped_name, rela.r_offset });
         if (has_name and eql(u8, name.?, "KERNEL_CR3") and typ == .R_AMD64_32) {
             patchCr3Value(buffer, offset);
         } else if (has_name and eql(u8, name.?, "STACK") and typ == .R_AMD64_64) {
