@@ -484,7 +484,7 @@ export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFra
         0x3 => {
             logger.log("BREAKPOINT\n", .{});
             logger.log("======================\n", .{});
-            logger.log("{}\n", .{frame});
+            logger.log("{x}\n", .{frame});
             logger.log("======================\n", .{});
         },
         0x31 => {

@@ -51,6 +51,9 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
     iso.addArtifactArg(kernel);
     iso_tls.dependOn(&iso.step);
 
+    const memory = builder.option([]const u8, "vm-memory", "VM memory e.g. 1G, 128M") orelse "1G";
+    const cpus = builder.option([]const u8, "vm-cpus", "number of vCPUs") orelse "1";
+
     var qemu_tls = builder.step("qemu", "Run QEMU");
     var qemu = builder.addSystemCommand(&[_][]const u8{"qemu-system-x86_64"});
     qemu.addArgs(&[_][]const u8{
@@ -63,11 +66,11 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
         "-display",
         "none",
         "-m",
-        "1G",
+        memory,
         "-M",
         "q35",
         "-smp",
-        "4",
+        cpus,
     });
 
     qemu.step.dependOn(&iso.step);
