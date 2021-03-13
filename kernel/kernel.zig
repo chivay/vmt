@@ -29,6 +29,12 @@ pub fn BIT(comptime n: comptime_int) BitStruct {
 
 pub fn panic(msg: []const u8, return_trace: ?*builtin.StackTrace) noreturn {
     logger.critical("PANIK: {s}\n", .{msg});
+
+    var it = std.debug.StackIterator.init(@returnAddress(), null);
+    logger.critical("Stack trace:\n", .{});
+    while (it.next()) |return_address| {
+        logger.critical("=> {x}\n", .{return_address});
+    }
     arch.hang();
 }
 
