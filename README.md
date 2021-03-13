@@ -7,7 +7,6 @@ Requires Zig from master.
 ## How to
 ```bash
 $ zig build qemu
-$ zig build qemu
 [Info] x86: CPU Vendor: GenuineIntel
 [Info] x86: Booting the kernel...
 [Info] x86.mm: BIOS memory map:
