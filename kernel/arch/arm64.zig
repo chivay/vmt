@@ -1,10 +1,10 @@
 const kernel = @import("root");
 
-pub const logger = kernel.printk_mod.logger("arm64");
+pub var logger = kernel.logging.logger("arm64"){};
 
 const BCM2837 = @import("arm64/platform/BCM2837.zig");
 
-const Node = kernel.printk_mod.SinkNode;
+const Node = kernel.logging.SinkNode;
 var uart_node = Node{ .data = format_to_uart };
 fn format_to_uart(buffer: []const u8) void {
     for (buffer) |c| {
@@ -45,7 +45,7 @@ pub const UART = struct {
 };
 
 export fn entry() noreturn {
-    kernel.printk_mod.register_sink(&uart_node);
+    kernel.logging.register_sink(&uart_node);
     logger.log("Witam z Raspberry Pi :)", .{});
     Watchdog.start(16 * 10);
     hang();
