@@ -30,7 +30,7 @@ pub fn cpuid(leaf: u32, subleaf: u32) callconv(.Inline) CPUIDInfo {
         : [leaf] "{eax}" (leaf),
           [subleaf] "{ecx}" (subleaf),
           [info] "r" (&info)
-        : "eax", "ebx", "ecx", "edx"
+        : "eax", "ebx", "ecx", "edx", "m"
     );
 
     return info;
