@@ -1,6 +1,7 @@
 const std = @import("std");
 const kernel = @import("root");
 const printk = kernel.printk;
+const lib = kernel.lib;
 const logger = @TypeOf(@import("../x86.zig").logger).childOf(@typeName(@This())){};
 const mm = kernel.mm;
 
@@ -151,7 +152,7 @@ const FADTData = packed struct {
 
 fn find_rsdp() ?*RSDP {
     var base = PhysicalAddress.new(0);
-    const limit = PhysicalAddress.new(mm.MiB(2));
+    const limit = PhysicalAddress.new(lib.MiB(2));
 
     // Use correct method (?)
     while (base.lt(limit)) : (base = base.add(16)) {

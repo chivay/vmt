@@ -1,6 +1,7 @@
 const std = @import("std");
 const kernel = @import("root");
 const mm = kernel.mm;
+const lib = kernel.lib;
 const x86 = @import("../x86.zig");
 
 const BIT = kernel.BIT;
@@ -110,7 +111,7 @@ pub const PT = struct {
         while (true) : (i += 1) {
             const page = self.get_page(i);
             if (page) |entry| {
-                const virt = self.base.?.add(i * mm.KiB(4));
+                const virt = self.base.?.add(i * lib.KiB(4));
                 context.walk(virt, entry, PageKind.Page4K.size());
             }
 
@@ -128,9 +129,9 @@ pub const PageKind = enum {
 
     pub fn size(self: @This()) usize {
         return switch (self) {
-            .Page4K => mm.KiB(4),
-            .Page2M => mm.MiB(2),
-            .Page1G => mm.GiB(1),
+            .Page4K => lib.KiB(4),
+            .Page2M => lib.MiB(2),
+            .Page1G => lib.GiB(1),
         };
     }
 };
@@ -177,7 +178,7 @@ pub const PD = struct {
 
         if (bit_set(entry, PRESENT) and !bit_set(entry, PAGE_2M)) {
             // present
-            const virt_base = self.base.?.add(idx * mm.MiB(2));
+            const virt_base = self.base.?.add(idx * lib.MiB(2));
             return PT.init(PhysicalAddress.new(entry & mask), virt_base);
         }
         return null;
@@ -239,7 +240,7 @@ pub const PD = struct {
                 },
                 .Page2M => {
                     const entry = self.get_page_2m(i).?;
-                    context.walk(self.base.?.add(i * mm.MiB(2)), entry, PageKind.Page2M.size());
+                    context.walk(self.base.?.add(i * lib.MiB(2)), entry, PageKind.Page2M.size());
                 },
                 else => {},
             }
@@ -309,7 +310,7 @@ pub const PDPT = struct {
 
         if (bit_set(entry, PRESENT) and !bit_set(entry, PAGE_1G)) {
             // present
-            const virt_base = self.base.?.add(mm.GiB(1) * idx);
+            const virt_base = self.base.?.add(lib.GiB(1) * idx);
             return PD.init(PhysicalAddress.new(entry & mask), virt_base);
         }
         return null;
@@ -391,7 +392,7 @@ pub const PML4 = struct {
 
     /// Some special handling for 48-bit paging
     fn get_virt_base(self: Self, idx: IdxType) VirtualAddress {
-        const offset = idx * mm.GiB(512);
+        const offset = idx * lib.GiB(512);
         // Easy case, we know the base
         if (self.base) |base| {
             return base.add(offset);

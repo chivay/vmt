@@ -4,6 +4,8 @@ usingnamespace @import("x86/asm.zig");
 
 const kernel = @import("root");
 const printk = kernel.printk;
+const lib = kernel.lib;
+
 pub const vga = @import("x86/vga.zig");
 pub const serial = @import("x86/serial.zig");
 pub const pic = @import("x86/pic.zig");
@@ -310,7 +312,7 @@ fn mb_entry(mb_info: u32) callconv(.C) noreturn {
 
     // setup identity mapping
     const VIRT_START = kernel.mm.VirtualAddress.new(@ptrToInt(&KERNEL_VIRT_BASE));
-    const SIZE = kernel.mm.MiB(16);
+    const SIZE = lib.MiB(16);
     mm.directMapping().* = kernel.mm.DirectMapping.init(VIRT_START, SIZE);
 
     // Initialize multiboot info pointer

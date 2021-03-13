@@ -2,6 +2,7 @@ const std = @import("std");
 const kernel = @import("root");
 const mm = kernel.mm;
 const x86 = @import("../x86.zig");
+const lib = kernel.lib;
 
 const PhysicalAddress = mm.PhysicalAddress;
 const VirtualAddress = mm.VirtualAddress;
@@ -30,17 +31,17 @@ comptime {
 
 const DIRECT_MAPPING = mm.VirtualMemoryRange.sized(
     VirtualAddress.new(0xffff800000000000),
-    mm.GiB(64),
+    lib.GiB(64),
 );
 
 const DYNAMIC_MAPPING = mm.VirtualMemoryRange.sized(
     VirtualAddress.new(0xffff900000000000),
-    mm.TiB(1),
+    lib.TiB(1),
 );
 
 const KERNEL_IMAGE = mm.VirtualMemoryRange.sized(
     VirtualAddress.new(0xffffffff80000000),
-    mm.GiB(1),
+    lib.GiB(1),
 );
 
 pub extern var kernel_end: [*]u8;
@@ -172,7 +173,7 @@ pub const VirtualMemoryImpl = struct {
         what: PhysicalAddress,
         options: *const MapOptions,
     ) !void {
-        if (!where.isAligned(mm.KiB(4)) or !what.isAligned(mm.KiB(4))) {
+        if (!where.isAligned(lib.KiB(4)) or !what.isAligned(lib.KiB(4))) {
             return Error.UnalignedAddress;
         }
 
@@ -208,7 +209,7 @@ pub const VirtualMemoryImpl = struct {
     }
 
     fn unmap_page_4kb(self: Self, where: VirtualAddress) !PhysicalAddress {
-        if (!where.isAligned(mm.KiB(4))) {
+        if (!where.isAligned(lib.KiB(4))) {
             return Error.UnalignedAddress;
         }
 
@@ -234,7 +235,7 @@ pub const VirtualMemoryImpl = struct {
         what: PhysicalAddress,
         options: *const MapOptions,
     ) !void {
-        if (!where.isAligned(mm.MiB(2)) or !what.isAligned(mm.MiB(2))) {
+        if (!where.isAligned(lib.MiB(2)) or !what.isAligned(lib.MiB(2))) {
             return Error.UnalignedAddress;
         }
 
@@ -272,7 +273,7 @@ pub const VirtualMemoryImpl = struct {
     }
 
     fn unmap_page_2mb(self: *Self, where: VirtualAddress) !PhysicalAddress {
-        if (!where.isAligned(mm.MiB(2))) {
+        if (!where.isAligned(lib.MiB(2))) {
             return Error.UnalignedAddress;
         }
 
@@ -298,9 +299,9 @@ pub const VirtualMemoryImpl = struct {
         options: *const MapOptions,
     ) !void {
         switch (length) {
-            mm.KiB(4) => return self.map_page_4kb(where, what, options),
-            mm.MiB(2) => return self.map_page_2mb(where, what, options),
-            mm.GiB(1) => @panic("Unimplemented"),
+            lib.KiB(4) => return self.map_page_4kb(where, what, options),
+            lib.MiB(2) => return self.map_page_2mb(where, what, options),
+            lib.GiB(1) => @panic("Unimplemented"),
             else => return Error.InvalidSize,
         }
     }
@@ -325,13 +326,13 @@ pub const VirtualMemoryImpl = struct {
             const what_addr = what.add(done);
 
             const use_2mb = init: {
-                if (!where_addr.isAligned(mm.MiB(2))) {
+                if (!where_addr.isAligned(lib.MiB(2))) {
                     break :init false;
                 }
-                if (!what_addr.isAligned(mm.MiB(2))) {
+                if (!what_addr.isAligned(lib.MiB(2))) {
                     break :init false;
                 }
-                if (left < mm.MiB(2)) {
+                if (left < lib.MiB(2)) {
                     break :init false;
                 }
                 break :init true;
@@ -414,31 +415,31 @@ pub const VirtualMemoryImpl = struct {
         defer logger.setLevel(.Info);
 
         var left = range;
-        while (left.size > mm.KiB(4)) {
+        while (left.size > lib.KiB(4)) {
             const kind = self.get_page_kind(left.base) orelse {
                 logger.err("Tried to unmap page at {}, but there's none\n", left.base);
                 return Error.MappingNotExists;
             };
             switch (kind) {
                 .Page4K => {
-                    if (!left.base.isAligned(mm.KiB(4))) {
-                        left.base.value = std.mem.alignBackward(left.base.value, mm.KiB(4));
+                    if (!left.base.isAligned(lib.KiB(4))) {
+                        left.base.value = std.mem.alignBackward(left.base.value, lib.KiB(4));
                     }
                     const page = self.unmap_page_4kb(left.base) catch |err| {
                         logger.err("Failed to unmap 4KiB page at {}\n", left.base);
                         return err;
                     };
-                    left.base = left.base.add(mm.KiB(4));
+                    left.base = left.base.add(lib.KiB(4));
                 },
                 .Page2M => {
-                    if (!left.base.isAligned(mm.MiB(2))) {
-                        left.base.value = std.mem.alignBackward(left.base.value, mm.MiB(2));
+                    if (!left.base.isAligned(lib.MiB(2))) {
+                        left.base.value = std.mem.alignBackward(left.base.value, lib.MiB(2));
                     }
                     const page = self.unmap_page_2mb(left.base) catch |err| {
                         logger.err("Failed to unmap 2MiB page at {}\n", left.base);
                         return err;
                     };
-                    left.base = left.base.add(mm.MiB(2));
+                    left.base = left.base.add(lib.MiB(2));
                 },
                 .Page1G => @panic("Unimplemented"),
             }
@@ -455,7 +456,7 @@ fn setup_kernel_vm() !void {
 
     // Initial 1GiB mapping
     logger.debug("Identity mapping 1GiB from 0 phys\n", .{});
-    const initial_mapping_size = mm.GiB(1);
+    const initial_mapping_size = lib.GiB(1);
     _ = try mm.kernel_vm.map_memory(
         DIRECT_MAPPING.base,
         PhysicalAddress.new(0x0),
@@ -469,7 +470,7 @@ fn setup_kernel_vm() !void {
     _ = mm.kernel_vm.map_memory(
         KERNEL_IMAGE.base,
         PhysicalAddress.new(0),
-        std.mem.alignForward(kernel_size, mm.MiB(2)),
+        std.mem.alignForward(kernel_size, lib.MiB(2)),
     ) catch |err| {
         logger.log("{}\n", .{err});
         @panic("Failed to remap kernel");
@@ -489,11 +490,11 @@ fn setup_kernel_vm() !void {
     _ = try mm.kernel_vm.map_memory(
         DIRECT_MAPPING.base.add(initial_mapping_size),
         PhysicalAddress.new(0 + initial_mapping_size),
-        mm.GiB(63),
+        lib.GiB(63),
     );
 
     directMapping().virt_start = DIRECT_MAPPING.base;
-    directMapping().size = mm.GiB(64);
+    directMapping().size = lib.GiB(64);
     logger.debug("VM setup done\n", .{});
 }
 

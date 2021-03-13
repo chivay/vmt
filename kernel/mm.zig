@@ -17,22 +17,6 @@ pub fn frameAllocator() *FrameAllocator {
     return arch.mm.frameAllocator();
 }
 
-pub fn KiB(comptime bytes: u64) u64 {
-    return bytes * 1024;
-}
-
-pub fn MiB(comptime bytes: u64) u64 {
-    return KiB(bytes) * 1024;
-}
-
-pub fn GiB(comptime bytes: u64) u64 {
-    return MiB(bytes) * 1024;
-}
-
-pub fn TiB(comptime bytes: u64) u64 {
-    return GiB(bytes) * 1024;
-}
-
 const Dumper = struct {
     const Mapping = struct {
         virt: VirtualAddress,
