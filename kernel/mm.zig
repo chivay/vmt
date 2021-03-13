@@ -55,110 +55,68 @@ pub fn dump_vm_mappings(vm: *VirtualMemory) void {
     vm.vm_impl.walk(Dumper, &visitor);
 }
 
-pub const VirtualAddress = struct {
-    const Type = arch.mm.VirtAddrType;
+fn AddrWrapper(comptime name: []const u8, comptime T: type) type {
+    return struct {
+        const Type = T;
+        const Self = @This();
 
-    value: Type,
+        value: Type,
 
-    pub fn new(value: Type) VirtualAddress {
-        return .{ .value = value };
-    }
-
-    pub fn into_pointer(self: @This(), comptime T: type) T {
-        return @intToPtr(T, self.value);
-    }
-
-    pub fn add(self: @This(), val: Type) VirtualAddress {
-        return .{ .value = val + self.value };
-    }
-
-    pub fn sub(self: @This(), val: Type) VirtualAddress {
-        return .{ .value = val + self.value };
-    }
-
-    pub fn le(self: @This(), other: VirtualAddress) bool {
-        return self.value <= other.value;
-    }
-
-    pub fn lt(self: @This(), other: VirtualAddress) bool {
-        return self.value < other.value;
-    }
-
-    pub fn eq(self: @This(), other: VirtualAddress) bool {
-        return self.value == other.value;
-    }
-
-    pub fn span(from: VirtualAddress, to: VirtualAddress) usize {
-        return to.value - from.value;
-    }
-
-    pub fn format(self: @This(), fmt: []const u8, options: std.fmt.FormatOptions, stream: anytype) !void {
-        try stream.writeAll(@typeName(@This()));
-        try stream.writeAll("{");
-        try std.fmt.formatInt(self.value, 16, false, options, stream);
-        try stream.writeAll("}");
-    }
-
-    pub fn isAligned(self: @This(), val: anytype) bool {
-        return std.mem.isAligned(self.value, val);
-    }
-};
-
-pub const PhysicalAddress = struct {
-    const Type = arch.mm.PhysAddrType;
-
-    value: Type,
-
-    pub fn new(value: Type) PhysicalAddress {
-        return .{ .value = value };
-    }
-
-    pub fn add(self: @This(), val: Type) PhysicalAddress {
-        return .{ .value = val + self.value };
-    }
-
-    pub fn sub(self: @This(), val: Type) PhysicalAddress {
-        return .{ .value = val + self.value };
-    }
-
-    pub fn eq(self: @This(), other: PhysicalAddress) bool {
-        return self.value == other.value;
-    }
-
-    pub fn span(from: PhysicalAddress, to: PhysicalAddress) usize {
-        return to.value - from.value;
-    }
-
-    pub fn max(self: @This(), other: PhysicalAddress) PhysicalAddress {
-        if (other.value > self.value) {
-            return other;
+        pub fn new(value: Type) Self {
+            return .{ .value = value };
         }
-        return self;
-    }
 
-    pub fn isAligned(self: @This(), val: anytype) bool {
-        return std.mem.isAligned(self.value, val);
-    }
+        pub fn into_pointer(self: Self, comptime P: type) P {
+            return @intToPtr(P, self.value);
+        }
 
-    pub fn alignForward(self: @This(), val: anytype) PhysicalAddress {
-        return PhysicalAddress.new(std.mem.alignForward(self.value, val));
-    }
+        pub fn add(self: Self, val: Type) Self {
+            return .{ .value = val + self.value };
+        }
 
-    pub fn lt(self: @This(), other: PhysicalAddress) bool {
-        return self.value < other.value;
-    }
+        pub fn sub(self: Self, val: Type) Self {
+            return .{ .value = val + self.value };
+        }
 
-    pub fn le(self: @This(), other: PhysicalAddress) bool {
-        return self.value <= other.value;
-    }
+        pub fn le(self: Self, other: Self) bool {
+            return self.value <= other.value;
+        }
 
-    pub fn format(self: @This(), fmt: []const u8, options: std.fmt.FormatOptions, stream: anytype) !void {
-        try stream.writeAll(@typeName(@This()));
-        try stream.writeAll("{");
-        try std.fmt.formatInt(self.value, 16, false, options, stream);
-        try stream.writeAll("}");
-    }
-};
+        pub fn lt(self: Self, other: Self) bool {
+            return self.value < other.value;
+        }
+
+        pub fn eq(self: Self, other: Self) bool {
+            return self.value == other.value;
+        }
+
+        pub fn span(from: Self, to: Self) usize {
+            return to.value - from.value;
+        }
+
+        pub fn max(self: Self, other: Self) Self {
+            return if (other.value > self.value) other else self;
+        }
+
+        pub fn alignForward(self: Self, val: anytype) Self {
+            return Self.new(std.mem.alignForward(self.value, val));
+        }
+
+        pub fn format(self: Self, fmt: []const u8, options: std.fmt.FormatOptions, stream: anytype) !void {
+            try stream.writeAll(name);
+            try stream.writeAll("{");
+            try std.fmt.formatInt(self.value, 16, false, options, stream);
+            try stream.writeAll("}");
+        }
+
+        pub fn isAligned(self: Self, val: anytype) bool {
+            return std.mem.isAligned(self.value, val);
+        }
+    };
+}
+
+pub const VirtualAddress = AddrWrapper("VirtualAddress", arch.mm.VirtAddrType);
+pub const PhysicalAddress = AddrWrapper("PhysicalAddress", arch.mm.PhysAddrType);
 
 pub const DirectMapping = struct {
     /// Simple mapping from boot time
