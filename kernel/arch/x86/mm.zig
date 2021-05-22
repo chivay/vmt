@@ -12,8 +12,8 @@ usingnamespace @import("paging.zig");
 pub const VirtAddrType = u64;
 pub const PhysAddrType = u64;
 
-const BIT = kernel.BIT;
-const bit_set = kernel.bit_set;
+const BIT = kernel.lib.BIT;
+const bit_set = kernel.lib.bit_set;
 
 pub var logger = @TypeOf(x86.logger).childOf(@typeName(@This())){};
 

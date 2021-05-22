@@ -4,8 +4,8 @@ const mm = kernel.mm;
 const lib = kernel.lib;
 const x86 = @import("../x86.zig");
 
-const BIT = kernel.BIT;
-const bit_set = kernel.bit_set;
+const BIT = kernel.lib.BIT;
+const bit_set = kernel.lib.bit_set;
 
 const PhysicalAddress = mm.PhysicalAddress;
 const VirtualAddress = mm.VirtualAddress;
