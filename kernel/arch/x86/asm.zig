@@ -51,6 +51,14 @@ pub const CR3 = struct {
     }
 };
 
+pub const CR2 = struct {
+    pub fn read() callconv(.Inline) u64 {
+        return asm volatile ("movq %%cr2, %[ret]"
+            : [ret] "=rax" (-> u64)
+        );
+    }
+};
+
 pub fn ltr(selector: u16) callconv(.Inline) void {
     asm volatile ("ltr %[selector]"
         :

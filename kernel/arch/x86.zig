@@ -406,7 +406,7 @@ export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFra
             @panic("General Protection Fault");
         },
         @enumToInt(CpuException.PageFault) => {
-            logger.log("#PF!\n", .{});
+            logger.log("#PF at {x}!\n", .{CR2.read()});
             hang();
         },
         else => {
