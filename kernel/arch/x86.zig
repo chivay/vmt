@@ -263,7 +263,7 @@ var boot_cpu_gsstruct: GSStruct = GSStruct{
     .cb = &initial_core_block,
 };
 
-pub fn getCoreBlock() *CoreBlock {
+pub fn getCoreBlock() callconv(.Inline) *CoreBlock {
     const blockptr = asm volatile ("mov %%gs:0x0,%[ret]"
         : [ret] "={rax}" (-> u64)
     );
