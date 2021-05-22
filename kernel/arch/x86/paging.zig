@@ -187,7 +187,7 @@ pub const PD = struct {
     pub fn get_pt_alloc(self: Self, allocator: *mm.FrameAllocator, idx: IdxType) !PT {
         if (self.get_pt(idx) == null) {
             const frame = try allocator.alloc_zero_frame();
-            const v = frame.value | PD.WRITABLE.v() | PD.PRESENT.v();
+            const v = frame.value | PD.USER.v() | PD.WRITABLE.v() | PD.PRESENT.v();
             self.set_entry(idx, v);
         }
         return self.get_pt(idx).?;
@@ -319,7 +319,7 @@ pub const PDPT = struct {
     pub fn get_pd_alloc(self: Self, allocator: *mm.FrameAllocator, idx: IdxType) !PD {
         if (self.get_pd(idx) == null) {
             const frame = try allocator.alloc_zero_frame();
-            const v = frame.value | PDPT.WRITABLE.v() | PDPT.PRESENT.v();
+            const v = frame.value | PDPT.USER.v() | PDPT.WRITABLE.v() | PDPT.PRESENT.v();
             self.set_entry(idx, v);
         }
         return self.get_pd(idx).?;
@@ -417,7 +417,7 @@ pub const PML4 = struct {
     pub fn get_pdpt_alloc(self: @This(), allocator: *mm.FrameAllocator, idx: IdxType) !PDPT {
         if (self.get_pdpt(idx) == null) {
             const frame = try allocator.alloc_zero_frame();
-            const v = frame.value | PML4.WRITABLE.v() | PML4.PRESENT.v();
+            const v = frame.value | PML4.USER.v() | PML4.WRITABLE.v() | PML4.PRESENT.v();
             self.set_entry(idx, v);
         }
         return self.get_pdpt(idx).?;
