@@ -1,6 +1,6 @@
 const std = @import("std");
 const assert = std.debug.assert;
-usingnamespace @import("x86/asm.zig");
+pub usingnamespace @import("x86/asm.zig");
 
 const kernel = @import("root");
 const printk = kernel.printk;

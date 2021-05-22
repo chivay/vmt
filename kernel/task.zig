@@ -19,7 +19,7 @@ pub const Task = struct {
 };
 
 pub fn switch_task(from: *Task, to: *Task) void {
-    arch.x86.asm_switch_task(&from.regs, &to.regs);
+    arch.asm_switch_task(&from.regs, &to.regs);
 }
 
 pub var init_task: Task = std.mem.zeroes(Task);
