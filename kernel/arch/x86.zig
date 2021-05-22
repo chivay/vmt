@@ -18,6 +18,11 @@ pub const trampoline = @import("x86/trampoline.zig");
 pub const smp = @import("x86/smp.zig");
 pub const gdt = @import("x86/gdt.zig");
 
+comptime {
+    // Force multiboot evaluation to make multiboot_entry present
+    _ = multiboot;
+}
+
 pub var logger = kernel.logging.logger("x86"){};
 
 const GDT = gdt.GlobalDescriptorTable(8);
@@ -182,13 +187,7 @@ var serial_node = Node{ .data = format_to_com1 };
 extern var KERNEL_BASE: [*]align(0x1000) u8;
 extern var KERNEL_VIRT_BASE: *align(0x1000) u8;
 
-var stack: [2 * 0x1000]u8 align(0x10) = undefined;
-
-export fn multiboot_entry(mb_info: u32) callconv(.C) noreturn {
-    @call(.{ .stack = stack[0..] }, mb_entry, .{mb_info});
-}
-
-fn mb_entry(mb_info: u32) callconv(.C) noreturn {
+pub fn boot_entry() noreturn {
     kernel.logging.register_sink(&vga_node);
     kernel.logging.register_sink(&serial_node);
 
@@ -196,12 +195,6 @@ fn mb_entry(mb_info: u32) callconv(.C) noreturn {
     const VIRT_START = kernel.mm.VirtualAddress.new(@ptrToInt(&KERNEL_VIRT_BASE));
     const SIZE = lib.MiB(16);
     mm.directMapping().* = kernel.mm.DirectMapping.init(VIRT_START, SIZE);
-
-    // Initialize multiboot info pointer
-    const mb_phys = kernel.mm.PhysicalAddress.new(mb_info);
-    const mb = mm.directMapping().to_virt(mb_phys);
-    const info = mb.into_pointer(*multiboot.Info);
-    multiboot.info_pointer = info;
 
     logger.debug("CR3: 0x{x}\n", .{CR3.read()});
     logger.info("CPU Vendor: {e}\n", .{std.fmt.fmtSliceEscapeLower(&get_vendor_string())});

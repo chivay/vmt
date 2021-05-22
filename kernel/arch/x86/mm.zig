@@ -63,66 +63,7 @@ pub fn frameAllocator() *mm.FrameAllocator {
 var kernel_vm: mm.VirtualMemory = undefined;
 
 pub fn detect_memory() ?mm.PhysicalMemoryRange {
-    if (x86.multiboot.info_pointer) |mbinfo| {
-        return detect_multiboot_memory(mbinfo);
-    }
-
-    return null;
-}
-
-fn detect_multiboot_memory(mb_info: *x86.multiboot.Info) ?mm.PhysicalMemoryRange {
-    if (!bit_set(mb_info.flags, BIT(6))) {
-        @panic("Missing memory map!");
-    }
-
-    const MemEntry = packed struct {
-        // at -4 offset
-        size: u32,
-        // at 0 offset
-        base_addr: u64,
-        length: u64,
-        type_: u32,
-    };
-
-    var best_slot: ?mm.PhysicalMemoryRange = null;
-
-    var offset = mm.PhysicalAddress.new(mb_info.mmap_addr);
-    const mmap_end = mm.PhysicalAddress.new(mb_info.mmap_addr + mb_info.mmap_length);
-
-    logger.log("BIOS memory map:\n", .{});
-    while (offset.lt(mmap_end)) {
-        const entry = x86.mm.directMapping().to_virt(offset).into_pointer(*MemEntry);
-
-        const start = entry.base_addr;
-        const end = start + entry.length - 1;
-        const status = switch (entry.type_) {
-            1 => "Available",
-            3 => "ACPI Mem",
-            4 => "Preserved on hibernation",
-            5 => "Defective",
-            else => "Reserved",
-        };
-        logger.log("[{x:0>10}-{x:0>10}] {s}\n", .{ start, end, status });
-        offset = offset.add(entry.size + @sizeOf(@TypeOf(entry.size)));
-
-        if (entry.type_ != 1) {
-            continue;
-        }
-        const this_slot = mm.PhysicalMemoryRange{
-            .base = PhysicalAddress.new(start),
-            .size = entry.length,
-        };
-
-        if (best_slot) |slot| {
-            if (this_slot.size > slot.size) {
-                best_slot = this_slot;
-            }
-        } else {
-            best_slot = this_slot;
-        }
-    }
-
-    return best_slot;
+    return x86.multiboot.get_multiboot_memory();
 }
 
 pub const VirtualMemoryImpl = struct {
