@@ -1,8 +1,7 @@
 const std = @import("std");
 const kernel = @import("root");
 const x86 = @import("../x86.zig");
-
-const elf = kernel.lib.elf;
+const elf = std.elf;
 
 var logger = @TypeOf(x86.logger).childOf(@typeName(@This())){};
 
@@ -29,7 +28,7 @@ pub fn get_nth_section(header: *const elf.Header, file: anytype, idx: u16) ?elf.
 
 pub fn getString(idx: u32) ?[]const u8 {
     var fbs = std.io.fixedBufferStream(trampoline_elf);
-    const header = kernel.lib.elf.Header.read(&fbs) catch |err| {
+    const header = elf.Header.read(&fbs) catch |err| {
         @panic("Invalid ELF header");
     };
     const section = find_section_by_name(&header, &fbs, ".strtab").?;
@@ -48,7 +47,7 @@ pub fn getString(idx: u32) ?[]const u8 {
 
 pub fn getSymbol(idx: u32) ?elf.Elf64_Sym {
     var fbs = std.io.fixedBufferStream(trampoline_elf);
-    const header = kernel.lib.elf.Header.read(&fbs) catch |err| {
+    const header = elf.Header.read(&fbs) catch |err| {
         @panic("Invalid ELF header");
     };
     const section = find_section_by_name(&header, &fbs, ".symtab").?;
@@ -94,7 +93,7 @@ pub fn find_section_by_name(header: *const elf.Header, file: anytype, name: []co
 
 pub fn getSectionByName(name: []const u8) ?elf.Elf64_Shdr {
     var fbs = std.io.fixedBufferStream(trampoline_elf);
-    const header = kernel.lib.elf.Header.read(&fbs) catch |err| {
+    const header = elf.Header.read(&fbs) catch |err| {
         @panic("Invalid ELF header");
     };
     return find_section_by_name(&header, &fbs, name);

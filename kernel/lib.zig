@@ -1,5 +1,4 @@
 const std = @import("std");
-pub const elf = @import("lib/elf.zig");
 pub const Spinlock = @import("lib/spinlock.zig").SpinLock;
 pub const Mutex = @import("lib/mutex.zig").Mutex;
 

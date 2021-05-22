@@ -3,7 +3,7 @@ const kernel = @import("root");
 const mm = kernel.mm;
 const x86 = @import("../x86.zig");
 const apic = x86.apic;
-const elf = kernel.lib.elf;
+const elf = std.elf;
 const MMIORegion = kernel.mmio.DynamicMMIORegion;
 const lib = kernel.lib;
 
