@@ -59,5 +59,19 @@ pub fn kmain() void {
     scheduler.addTask(taskA);
     scheduler.addTask(taskB);
 
-    arch.idle();
+    arch.map_userspace() catch |err| {
+        @panic("Failed to map userspace");
+    };
+    logger.info("Jumping to userspace\n", .{});
+
+    arch.x86.cli();
+    const userspace_rip: u64 = 0x1337000;
+    const userspace_flags: u64 = 0;
+
+    asm volatile (
+        \\ sysret
+        :
+        : [rip] "{rcx}" (userspace_rip),
+          [flags] "{r11}" (userspace_flags)
+    );
 }

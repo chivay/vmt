@@ -138,6 +138,11 @@ pub fn hang() noreturn {
     }
 }
 
+pub fn syscall_supported() bool {
+    const info = cpuid(0x80000001, 0);
+    return ((info.edx >> 11) & 1) != 0;
+}
+
 pub fn MSR(n: u32) type {
     return struct {
         pub fn read() callconv(.Inline) u64 {
@@ -151,7 +156,8 @@ pub fn MSR(n: u32) type {
 
 pub const APIC_BASE = MSR(0x0000_001B);
 pub const EFER = MSR(0xC000_0080);
-pub const LSTAR = MSR(0xC000_0082);
+pub const IA32_STAR = MSR(0xC000_0081);
+pub const IA32_LSTAR = MSR(0xC000_0082);
 
 pub const FSBASE = MSR(0xC000_0100);
 pub const GSBASE = MSR(0xC000_0101);
@@ -202,9 +208,28 @@ pub fn enable_interrupts() void {
     sti();
 }
 
+pub fn map_userspace() !void {
+    const frame = try kernel.mm.frameAllocator().alloc_zero_frame();
+    const range = try kernel.mm.kernel_vm.map_memory(
+        kernel.mm.VirtualAddress.new(0x1337000),
+        frame,
+        0x1000,
+        kernel.mm.VirtualMemory.Protection{
+            .read = true,
+            .write = true,
+            .execute = true,
+            .user = true,
+        },
+    );
+    std.mem.copy(u8, @intToPtr([*]u8, 0x1337000)[0..0x1000], "\x90\x90\xeb\xfe");
+    logger.info("Userspace range: {}\n", .{range});
+
+    kernel.mm.dump_vm_mappings(&kernel.mm.kernel_vm);
+}
+
 const InterruptStub = fn () callconv(.Naked) void;
 
-const CpuException = enum (u8) {
+const CpuException = enum(u8) {
     DivisionByZero = 0,
     Debug = 1,
     NonMaskableInterrupt = 2,
@@ -402,9 +427,22 @@ const exception_stubs = init: {
     break :init stubs;
 };
 
+fn setup_syscall() void {
+    // Enable syscall / sysret
+    EFER.write(EFER.read() | 1);
+
+    // Setup sysret instruction
+    // Stack segment — IA32_STAR[63:48] + 8.
+    // Target code segment — Reads a non-NULL selector from IA32_STAR[63:48] + 16.
+    const sysret_selector = @as(u64, user_base.raw | 3);
+    const syscall_selector = @as(u64, null_entry.raw | 0);
+    IA32_STAR.write((sysret_selector << 48) | (syscall_selector << 32));
+}
+
 pub var null_entry: gdt.SegmentSelector = undefined;
 pub var kernel_code: gdt.SegmentSelector = undefined;
 pub var kernel_data: gdt.SegmentSelector = undefined;
+pub var user_base: gdt.SegmentSelector = undefined;
 pub var user_code: gdt.SegmentSelector = undefined;
 pub var user_data: gdt.SegmentSelector = undefined;
 
@@ -413,14 +451,17 @@ pub fn init_cpu() !void {
     const Entry = GDT.Entry;
 
     null_entry = main_gdt.add_entry(Entry.nil);
-    kernel_code = main_gdt.add_entry(Entry.KernelCode);
     kernel_data = main_gdt.add_entry(Entry.KernelData);
-    user_code = main_gdt.add_entry(Entry.UserCode);
+    kernel_code = main_gdt.add_entry(Entry.KernelCode);
+
+    // user code must be just after user data, see sysret
+    user_base = main_gdt.add_entry(Entry.nil);
     user_data = main_gdt.add_entry(Entry.UserData);
+    user_code = main_gdt.add_entry(Entry.UserCode);
 
     // Kinda ugly, refactor this
-    //const tss_base = main_gdt.add_entry(Entry.TaskState(&main_tss)[0]);
-    //_ = main_gdt.add_entry(Entry.TaskState(&main_tss)[1]);
+    const tss_base = main_gdt.add_entry(Entry.TaskState(&main_tss)[0]);
+    _ = main_gdt.add_entry(Entry.TaskState(&main_tss)[1]);
 
     main_gdt.load();
 
@@ -432,7 +473,7 @@ pub fn init_cpu() !void {
 
     main_gdt.reload_cs(kernel_code);
 
-    //x86.ltr(tss_base.raw);
+    ltr(tss_base.raw);
 
     for (exception_stubs) |ptr, i| {
         const addr: u64 = @ptrToInt(ptr);
@@ -442,6 +483,12 @@ pub fn init_cpu() !void {
     main_idt.load();
 
     GSBASE.write(@ptrToInt(&boot_cpu_gsstruct));
+
+    if (!syscall_supported()) {
+        @panic("Syscall not supported");
+    }
+
+    setup_syscall();
 
     //pic.remap(0x30, 0x38);
     //// enable only keyboard interrupt
