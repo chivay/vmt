@@ -214,6 +214,7 @@ pub fn init() void {
         virt_start,
         phys_start,
         PAGE_SIZE,
+        mm.VirtualMemory.Protection.RWX,
     ) catch |err| {
         logger.err("Failed to map AP memory");
         return;
