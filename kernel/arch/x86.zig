@@ -29,7 +29,7 @@ const GDT = gdt.GlobalDescriptorTable(8);
 const IDT = InterruptDescriptorTable;
 
 pub var main_gdt align(64) = GDT.new();
-pub var main_tss align(64) = std.mem.zeroes(TSS);
+pub var main_tss align(64) = std.mem.zeroes(gdt.TSS);
 pub var main_idt align(64) = std.mem.zeroes(IDT);
 
 /// Physical-address width supported by the processor. <= 52
@@ -117,20 +117,6 @@ pub const InterruptFrame = packed struct {
         assert(@sizeOf(InterruptFrame) == 40);
     }
 };
-
-pub const TSS = packed struct {
-    _reserved1: u32,
-    rsp: [3]u64,
-    _reserved2: u32,
-    _reserved3: u32,
-    ist: [8]u64,
-    _reserved4: u16,
-    io_map_addr: u16,
-};
-
-comptime {
-    assert(@sizeOf(TSS) == 104);
-}
 
 pub fn get_vendor_string() [12]u8 {
     const info = cpuid(0, 0);

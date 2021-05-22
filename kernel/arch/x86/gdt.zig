@@ -2,6 +2,20 @@ const std = @import("std");
 const assert = std.debug.assert;
 const x86 = @import("../x86.zig");
 
+pub const TSS = packed struct {
+    _reserved1: u32,
+    rsp: [3]u64,
+    _reserved2: u32,
+    _reserved3: u32,
+    ist: [8]u64,
+    _reserved4: u16,
+    io_map_addr: u16,
+};
+
+comptime {
+    assert(@sizeOf(TSS) == 104);
+}
+
 pub const PrivilegeLevel = enum(u2) {
     Ring0 = 0,
     Ring3 = 3,
