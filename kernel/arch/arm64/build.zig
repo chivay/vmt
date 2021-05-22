@@ -14,7 +14,7 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
     };
     kernel.addAssemblyFile("kernel/arch/arm64/boot.S");
     kernel.setLinkerScriptPath("kernel/arch/arm64/layout.ld");
-    kernel.code_model = builtin.CodeModel.small;
+    kernel.code_model = std.builtin.CodeModel.small;
     kernel.setTarget(cross_target);
     kernel.setOutputDir("build/arm64");
 

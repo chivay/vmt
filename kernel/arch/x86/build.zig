@@ -32,7 +32,7 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
         .abi = std.Target.Abi.none,
     };
     kernel.setTarget(cross_target);
-    kernel.code_model = builtin.CodeModel.kernel;
+    kernel.code_model = std.builtin.CodeModel.kernel;
     kernel.want_lto = false;
 
     kernel.setLinkerScriptPath("kernel/arch/x86/linker.ld");

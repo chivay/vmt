@@ -27,7 +27,7 @@ pub fn BIT(comptime n: comptime_int) BitStruct {
     return .{ .shift = n };
 }
 
-pub fn panic(msg: []const u8, return_trace: ?*builtin.StackTrace) noreturn {
+pub fn panic(msg: []const u8, return_trace: ?*std.builtin.StackTrace) noreturn {
     logger.critical("PANIK: {s}\n", .{msg});
 
     var it = std.debug.StackIterator.init(@returnAddress(), null);

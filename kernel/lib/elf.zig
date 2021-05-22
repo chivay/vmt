@@ -11,6 +11,7 @@ const math = std.math;
 const mem = std.mem;
 const debug = std.debug;
 const File = std.fs.File;
+const native_endian = @import("builtin").target.cpu.arch.endian();
 
 pub const AT_NULL = 0;
 pub const AT_IGNORE = 1;
@@ -379,7 +380,7 @@ pub const Header = struct {
             ELFDATA2MSB => .Big,
             else => return error.InvalidElfEndian,
         };
-        const need_bswap = endian != std.builtin.endian;
+        const need_bswap = endian != native_endian;
 
         const is_64 = switch (hdr32.e_ident[EI_CLASS]) {
             ELFCLASS32 => false,
@@ -486,7 +487,7 @@ pub fn SectionHeaderIterator(ParseSource: anytype) type {
                 try self.parse_source.reader().readNoEof(mem.asBytes(&shdr));
 
                 // ELF endianness matches native endianness.
-                if (self.elf_header.endian == std.builtin.endian) return shdr;
+                if (self.elf_header.endian == native_endian) return shdr;
 
                 // Convert fields to native endianness.
                 return Elf64_Shdr{
@@ -509,7 +510,7 @@ pub fn SectionHeaderIterator(ParseSource: anytype) type {
             try self.parse_source.reader().readNoEof(mem.asBytes(&shdr));
 
             // ELF endianness does NOT match native endianness.
-            if (self.elf_header.endian != std.builtin.endian) {
+            if (self.elf_header.endian != native_endian) {
                 // Convert fields to native endianness.
                 shdr = .{
                     .sh_name = @byteSwap(@TypeOf(shdr.sh_name), shdr.sh_name),
