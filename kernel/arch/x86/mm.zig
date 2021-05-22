@@ -125,7 +125,7 @@ pub const VirtualMemoryImpl = struct {
 
         const pdpt = try self.pml4.get_pdpt_alloc(self.allocator, pml4_index);
         const pd = try pdpt.get_pd_alloc(self.allocator, pdpt_index);
-        const pt = try pd.get_pt_alloc(self.allocator, pdpt_index);
+        const pt = try pd.get_pt_alloc(self.allocator, pd_index);
 
         if (pt.get_entry_kind(pt_index) != PT.EntryKind.Missing) {
             return Error.MappingExists;
