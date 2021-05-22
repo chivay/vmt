@@ -3,7 +3,6 @@ const assert = std.debug.assert;
 pub usingnamespace @import("x86/asm.zig");
 
 const kernel = @import("root");
-const printk = kernel.printk;
 const lib = kernel.lib;
 
 pub const vga = @import("x86/vga.zig");
@@ -17,10 +16,11 @@ pub const pci = @import("x86/pci.zig");
 pub const apic = @import("x86/apic.zig");
 pub const trampoline = @import("x86/trampoline.zig");
 pub const smp = @import("x86/smp.zig");
+pub const gdt = @import("x86/gdt.zig");
 
 pub var logger = kernel.logging.logger("x86"){};
 
-const GDT = GlobalDescriptorTable(8);
+const GDT = gdt.GlobalDescriptorTable(8);
 const IDT = InterruptDescriptorTable;
 
 pub var main_gdt align(64) = GDT.new();
@@ -67,7 +67,7 @@ pub const InterruptDescriptorTable = packed struct {
             assert(@sizeOf(@This()) == 16);
         }
 
-        pub fn new(addr: u64, code_selector: SegmentSelector, ist: u3) Entry {
+        pub fn new(addr: u64, code_selector: gdt.SegmentSelector, ist: u3) Entry {
             return .{
                 .raw = .{
                     .reserved__ = 0,
@@ -125,124 +125,6 @@ pub const TSS = packed struct {
 
 comptime {
     assert(@sizeOf(TSS) == 104);
-}
-
-pub const PrivilegeLevel = enum(u2) {
-    Ring0 = 0,
-    Ring3 = 3,
-};
-
-pub const SegmentSelector = struct {
-    raw: u16,
-
-    pub fn new(_index: u16, _rpl: PrivilegeLevel) SegmentSelector {
-        return .{ .raw = _index << 3 | @enumToInt(_rpl) };
-    }
-
-    pub fn index(self: @This()) u16 {
-        return self.raw >> 3;
-    }
-
-    pub fn rpl(self: @This()) SegmentSelector {
-        return @intToEnum(PrivilegeLevel, self.raw & 0b11);
-    }
-};
-
-pub fn GlobalDescriptorTable(n: u16) type {
-    return packed struct {
-        entries: [n]Entry align(0x10),
-        free_slot: u16,
-
-        pub const Entry = packed struct {
-            raw: u64,
-
-            const WRITABLE = 1 << 41;
-            const CONFORMING = 1 << 42;
-            const EXECUTABLE = 1 << 43;
-            const USER = 1 << 44;
-            const RING_3 = 3 << 45;
-            const PRESENT = 1 << 47;
-            const LONG_MODE = 1 << 53;
-            const DEFAULT_SIZE = 1 << 54;
-            const GRANULARITY = 1 << 55;
-
-            const LIMIT_LO = 0xffff;
-            const LIMIT_HI = 0xf << 48;
-
-            const ORDINARY = USER | PRESENT | WRITABLE | LIMIT_LO | LIMIT_HI | GRANULARITY;
-
-            pub const nil = Entry{ .raw = 0 };
-            pub const KernelData = Entry{ .raw = ORDINARY | DEFAULT_SIZE };
-            pub const KernelCode = Entry{ .raw = ORDINARY | EXECUTABLE | LONG_MODE };
-            pub const UserCode = Entry{ .raw = KernelCode.raw | RING_3 };
-            pub const UserData = Entry{ .raw = KernelData.raw | RING_3 };
-
-            pub fn TaskState(tss: *TSS) [2]Entry {
-                var high: u64 = 0;
-                var ptr = @ptrToInt(tss) - 0xffffffff00000000;
-
-                var low: u64 = 0;
-                low |= PRESENT;
-                // 64 bit available TSS;
-                low |= 0b1001 << 40;
-                // set limit
-                low |= (@sizeOf(TSS) - 1) & 0xffff;
-
-                // set pointer
-                // 0..24 bits
-                low |= (ptr & 0xffffff) << 16;
-
-                // high bits part
-                high |= (ptr & 0xffffffff00000000) >> 32;
-                return [2]Entry{ .{ .raw = low }, .{ .raw = high } };
-            }
-        };
-
-        const Self = @This();
-
-        pub fn new() Self {
-            var gdt = Self{ .entries = std.mem.zeroes([n]Entry), .free_slot = 0 };
-            return gdt;
-        }
-
-        pub fn add_entry(self: *Self, entry: Entry) SegmentSelector {
-            assert(self.free_slot < n);
-            self.entries[self.free_slot] = entry;
-            self.free_slot += 1;
-
-            const dpl = @intToEnum(PrivilegeLevel, @intCast(u2, (entry.raw >> 45) & 0b11));
-            return SegmentSelector.new(self.free_slot - 1, dpl);
-        }
-
-        pub fn load(self: Self) void {
-            const descriptor = packed struct {
-                size: u16,
-                base: u64,
-            }{
-                .base = @ptrToInt(&self.entries),
-                .size = @sizeOf(@TypeOf(self.entries)) - 1,
-            };
-
-            lgdt(@ptrToInt(&descriptor));
-        }
-
-        pub fn reload_cs(self: Self, selector: SegmentSelector) void {
-            __reload_cs(selector.raw);
-        }
-    };
-}
-
-extern fn __reload_cs(selector: u32) void;
-comptime {
-    asm (
-        \\ .global __reload_cs;
-        \\ .type __reload_cs, @function;
-        \\ __reload_cs:
-        \\ pop %rsi
-        \\ push %rdi
-        \\ push %rsi
-        \\ lretq
-    );
 }
 
 pub fn get_vendor_string() [12]u8 {
@@ -513,11 +395,11 @@ const exception_stubs = init: {
     break :init stubs;
 };
 
-pub var null_entry: SegmentSelector = undefined;
-pub var kernel_code: SegmentSelector = undefined;
-pub var kernel_data: SegmentSelector = undefined;
-pub var user_code: SegmentSelector = undefined;
-pub var user_data: SegmentSelector = undefined;
+pub var null_entry: gdt.SegmentSelector = undefined;
+pub var kernel_code: gdt.SegmentSelector = undefined;
+pub var kernel_data: gdt.SegmentSelector = undefined;
+pub var user_code: gdt.SegmentSelector = undefined;
+pub var user_data: gdt.SegmentSelector = undefined;
 
 pub fn init_cpu() !void {
     cpu_phys_bits = get_maxphyaddr();
