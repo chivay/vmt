@@ -158,12 +158,38 @@ pub const VirtualMemory = struct {
     vm_impl: *arch.mm.VirtualMemoryImpl,
     const Self = @This();
 
+    pub const Protection = struct {
+        read: bool,
+        write: bool,
+        execute: bool,
+        user: bool,
+
+        pub const RWX = Protection{
+            .read = true,
+            .write = true,
+            .execute = true,
+            .user = false,
+        };
+        pub const RW = Protection{
+            .read = true,
+            .write = true,
+            .execute = false,
+            .user = false,
+        };
+        pub const R = Protection{
+            .read = true,
+            .write = false,
+            .execute = false,
+            .user = false,
+        };
+    };
+
     pub fn init(vm_impl: *arch.mm.VirtualMemoryImpl) VirtualMemory {
         return .{ .vm_impl = vm_impl };
     }
 
-    pub fn map_memory(self: Self, where: VirtualAddress, what: PhysicalAddress, length: usize) !VirtualMemoryRange {
-        return self.vm_impl.map_memory(where, what, length);
+    pub fn map_memory(self: Self, where: VirtualAddress, what: PhysicalAddress, length: usize, protection: Protection) !VirtualMemoryRange {
+        return self.vm_impl.map_memory(where, what, length, protection);
     }
 
     pub fn map_io(self: Self, what: PhysicalAddress, length: usize) !VirtualMemoryRange {

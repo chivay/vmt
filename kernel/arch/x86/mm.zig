@@ -299,13 +299,14 @@ pub const VirtualMemoryImpl = struct {
         where: VirtualAddress,
         what: PhysicalAddress,
         size: usize,
+        protection: kernel.mm.VirtualMemory.Protection,
     ) !mm.VirtualMemoryRange {
         const options = MapOptions{
-            .writable = true,
-            .user = false,
+            .writable = protection.write,
+            .user = protection.user,
             .write_through = false,
             .cache_disable = true,
-            .no_execute = false,
+            .no_execute = !protection.execute,
         };
         return self.map_range(where, what, size, &options);
     }
@@ -402,6 +403,7 @@ fn setup_kernel_vm() !void {
         DIRECT_MAPPING.base,
         PhysicalAddress.new(0x0),
         initial_mapping_size,
+        mm.VirtualMemory.Protection.RWX,
     );
 
     // Map kernel image
@@ -412,6 +414,7 @@ fn setup_kernel_vm() !void {
         KERNEL_IMAGE.base,
         PhysicalAddress.new(0),
         std.mem.alignForward(kernel_size, lib.MiB(2)),
+        mm.VirtualMemory.Protection.RWX,
     ) catch |err| {
         logger.log("{}\n", .{err});
         @panic("Failed to remap kernel");
@@ -432,6 +435,7 @@ fn setup_kernel_vm() !void {
         DIRECT_MAPPING.base.add(initial_mapping_size),
         PhysicalAddress.new(0 + initial_mapping_size),
         lib.GiB(63),
+        mm.VirtualMemory.Protection.RWX,
     );
 
     directMapping().virt_start = DIRECT_MAPPING.base;
