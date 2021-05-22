@@ -218,6 +218,31 @@ pub fn enable_interrupts() void {
 
 const InterruptStub = fn () callconv(.Naked) void;
 
+const CpuException = enum (u8) {
+    DivisionByZero = 0,
+    Debug = 1,
+    NonMaskableInterrupt = 2,
+    Breakpoint = 3,
+    Overflow = 4,
+    BoundRangeExceeded = 5,
+    InvalidOpcode = 6,
+    DeviceNotAvailable = 7,
+    DoubleFault = 8,
+    CoprocessorSegmentOverrun = 9,
+    InvalidTSS = 10,
+    SegmentNotPresent = 11,
+    StackSegmentFault = 12,
+    GeneralProtectionFault = 13,
+    PageFault = 14,
+    X87FloatingPointException = 16,
+    AlignmentCheck = 17,
+    MachineCheck = 18,
+    SIMDFloatingPointException = 19,
+    VirtualizationException = 20,
+    SecurityException = 30,
+    _,
+};
+
 fn has_error_code(vector: u16) bool {
     return switch (vector) {
         // Double Fault
@@ -356,7 +381,7 @@ fn keyboard_echo() void {
 export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFrame) callconv(.C) void {
     switch (interrupt_num) {
         // Breakpoint
-        0x3 => {
+        @enumToInt(CpuException.Debug) => {
             logger.log("BREAKPOINT\n", .{});
             logger.log("======================\n", .{});
             logger.log("{x}\n", .{frame});
@@ -366,8 +391,11 @@ export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFra
             logger.log("{x}\n", .{frame});
             keyboard_echo();
         },
-        0xe => {
-            logger.log("#GP!\n", .{});
+        @enumToInt(CpuException.GeneralProtectionFault) => {
+            @panic("General Protection Fault");
+        },
+        @enumToInt(CpuException.PageFault) => {
+            logger.log("#PF!\n", .{});
             hang();
         },
         else => {
