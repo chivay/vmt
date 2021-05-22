@@ -7,7 +7,6 @@ pub const PrivilegeLevel = enum(u2) {
     Ring3 = 3,
 };
 
-
 pub const SegmentSelector = struct {
     raw: u16,
 

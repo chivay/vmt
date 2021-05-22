@@ -11,7 +11,6 @@ const Task = task.Task;
 
 pub const logger = logging.logger("kernel"){};
 
-
 pub fn panic(msg: []const u8, return_trace: ?*std.builtin.StackTrace) noreturn {
     logger.critical("PANIK: {s}\n", .{msg});
 
