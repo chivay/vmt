@@ -484,7 +484,10 @@ pub fn exit_to_userspace(rip: u64, rsp: u64) noreturn {
 }
 
 fn setup_syscall() void {
-    // Enable syscall / sysret
+    if (!syscall_supported()) {
+        @panic("Syscall not supported");
+    }
+
     EFER.write(EFER.read() | 1);
 
     main_tss.rsp[0] = @ptrToInt(&stack[0]) + stack.len;
@@ -544,10 +547,6 @@ pub fn init_cpu() !void {
     main_idt.load();
 
     GSBASE.write(@ptrToInt(&boot_cpu_gsstruct));
-
-    if (!syscall_supported()) {
-        @panic("Syscall not supported");
-    }
 
     setup_syscall();
 
