@@ -403,8 +403,7 @@ fn keyboard_echo() void {
 
 export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFrame) callconv(.C) void {
     switch (interrupt_num) {
-        // Breakpoint
-        @enumToInt(CpuException.Debug) => {
+        @enumToInt(CpuException.Breakpoint) => {
             logger.log("BREAKPOINT\n", .{});
             logger.log("======================\n", .{});
             logger.log("{x}\n", .{frame});
