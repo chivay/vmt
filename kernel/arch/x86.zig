@@ -228,6 +228,7 @@ pub fn enter_userspace() !void {
     const program =
         "\x90" ++ // nop
         "\x90" ++ // nop
+        "\xcc" ++ // int3
         "\x66\x87\xdb" ++ // bochs breakpoint
         "\x0f\x05" ++ // syscall
         "\xeb\xfc" // jmp to syscall
@@ -487,7 +488,7 @@ fn setup_syscall() void {
     // Enable syscall / sysret
     EFER.write(EFER.read() | 1);
 
-    main_tss.rsp[0] = 0xffffffff41414141;
+    main_tss.rsp[0] = @ptrToInt(&stack[0]) + stack.len;
     // Setup sysret instruction
     // Stack segment — IA32_STAR[63:48] + 8.
     // Target code segment — Reads a non-NULL selector from IA32_STAR[63:48] + 16.
