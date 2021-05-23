@@ -491,8 +491,8 @@ fn setup_syscall() void {
     // Setup sysret instruction
     // Stack segment — IA32_STAR[63:48] + 8.
     // Target code segment — Reads a non-NULL selector from IA32_STAR[63:48] + 16.
-    const sysret_selector = @as(u64, user_code.raw | 3);
-    const syscall_selector = @as(u64, kernel_code.raw | 0);
+    const sysret_selector = @as(u64, user_base.raw);
+    const syscall_selector = @as(u64, null_entry.raw);
     IA32_STAR.write((sysret_selector << 48) | (syscall_selector << 32));
     IA32_LSTAR.write(@ptrToInt(syscall_entry));
 }
@@ -510,13 +510,13 @@ pub fn init_cpu() !void {
 
     null_entry = main_gdt.add_entry(Entry.nil);
     // kernel data must be just after code - required by syscall instruction
-    kernel_code = main_gdt.add_entry(Entry.KernelCode);
     kernel_data = main_gdt.add_entry(Entry.KernelData);
+    kernel_code = main_gdt.add_entry(Entry.KernelCode);
 
     // user data must be just user code - required by syscall instruction
     user_base = main_gdt.add_entry(Entry.nil);
-    user_code = main_gdt.add_entry(Entry.UserCode);
     user_data = main_gdt.add_entry(Entry.UserData);
+    user_code = main_gdt.add_entry(Entry.UserCode);
 
     // Kinda ugly, refactor this
     logger.log("TSS is at {*}\n", .{&main_tss});
