@@ -68,7 +68,7 @@ pub fn GlobalDescriptorTable(n: u16) type {
 
             pub fn TaskState(tss: *TSS) [2]Entry {
                 var high: u64 = 0;
-                var ptr = @ptrToInt(tss) - 0xffffffff00000000;
+                var ptr = @ptrToInt(tss);
 
                 var low: u64 = 0;
                 low |= PRESENT;
@@ -76,13 +76,14 @@ pub fn GlobalDescriptorTable(n: u16) type {
                 low |= 0b1001 << 40;
                 // set limit
                 low |= (@sizeOf(TSS) - 1) & 0xffff;
+                low |= ((ptr >> 24) & 0xff) << 56;
 
                 // set pointer
                 // 0..24 bits
                 low |= (ptr & 0xffffff) << 16;
 
                 // high bits part
-                high |= (ptr & 0xffffffff00000000) >> 32;
+                high |= ptr >> 32;
                 return [2]Entry{ .{ .raw = low }, .{ .raw = high } };
             }
         };

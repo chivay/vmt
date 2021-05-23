@@ -178,10 +178,13 @@ var serial_node = Node{ .data = format_to_com1 };
 
 extern var KERNEL_BASE: [*]align(0x1000) u8;
 extern var KERNEL_VIRT_BASE: *align(0x1000) u8;
+pub var stack: [2 * 0x1000]u8 align(0x10) = undefined;
 
 pub fn boot_entry() noreturn {
     kernel.logging.register_sink(&vga_node);
     kernel.logging.register_sink(&serial_node);
+
+    kernel.task.init_task.regs.rsp = @ptrToInt(&stack[0]) + stack.len;
 
     // setup identity mapping
     const VIRT_START = kernel.mm.VirtualAddress.new(@ptrToInt(&KERNEL_VIRT_BASE));
@@ -208,10 +211,11 @@ pub fn enable_interrupts() void {
     sti();
 }
 
-pub fn map_userspace() !void {
+pub fn enter_userspace() !void {
     const frame = try kernel.mm.frameAllocator().alloc_zero_frame();
+    const userspace_location = 0x1337000;
     const range = try kernel.mm.kernel_vm.map_memory(
-        kernel.mm.VirtualAddress.new(0x1337000),
+        kernel.mm.VirtualAddress.new(userspace_location),
         frame,
         0x1000,
         kernel.mm.VirtualMemory.Protection{
@@ -221,10 +225,15 @@ pub fn map_userspace() !void {
             .user = true,
         },
     );
-    std.mem.copy(u8, @intToPtr([*]u8, 0x1337000)[0..0x1000], "\x90\x90\xeb\xfe");
-    logger.info("Userspace range: {}\n", .{range});
-
-    kernel.mm.dump_vm_mappings(&kernel.mm.kernel_vm);
+    const program =
+        "\x90" ++ // nop
+        "\x90" ++ // nop
+        "\x66\x87\xdb" ++ // bochs breakpoint
+        "\x0f\x05" ++ // syscall
+        "\xeb\xfc" // jmp to syscall
+    ;
+    std.mem.copy(u8, @intToPtr([*]u8, userspace_location)[0..0x1000], program);
+    exit_to_userspace(userspace_location, 0x0);
 }
 
 const InterruptStub = fn () callconv(.Naked) void;
@@ -286,10 +295,12 @@ var initial_core_block: CoreBlock = CoreBlock{
 
 pub const GSStruct = packed struct {
     cb: *CoreBlock,
+    scratch_space: u64,
 };
 
 var boot_cpu_gsstruct: GSStruct = GSStruct{
     .cb = &initial_core_block,
+    .scratch_space = 0,
 };
 
 pub fn getCoreBlock() callconv(.Inline) *CoreBlock {
@@ -427,16 +438,63 @@ const exception_stubs = init: {
     break :init stubs;
 };
 
+fn syscall_entry() callconv(.Naked) void {
+    comptime {
+        std.debug.assert(@byteOffsetOf(kernel.task.Task, "regs") == 0);
+        std.debug.assert(@byteOffsetOf(TaskRegs, "rsp") == 0);
+    }
+    asm volatile (
+        \\ // Switch to kernel GS
+        \\ swapgs
+        \\ // Save userspace stack
+        \\ mov %%rsp, %%gs:0x8
+        \\ // Load kernel stack from task
+        \\ mov %%gs:0x0, %%rsp // rsp == *CoreBlock
+        \\ mov 0(%%rsp), %%rsp // rsp == *Task
+        \\ mov 0(%%rsp), %%rsp // rsp == kernel_rsp
+        \\ push %%rcx
+        \\ push %%r11
+        \\ call handle_syscall
+        \\ pop %%r11
+        \\ pop %%rcx
+        \\ // Switch to user GS
+        \\ swapgs
+        \\ // Go back to userspace
+        \\ sysretq
+    );
+}
+
+export fn handle_syscall() callconv(.C) u64 {
+    logger.log("Hello from syscall\n", .{});
+    return 0;
+}
+
+pub fn exit_to_userspace(rip: u64, rsp: u64) noreturn {
+    const flags: u64 = 0;
+    asm volatile (
+        \\ swapgs
+        \\ xchgw %%bx, %%bx
+        \\ sysretq
+        :
+        : [rip] "{rcx}" (rip),
+          [rsp] "{rsp}" (rsp),
+          [flags] "{r11}" (flags)
+    );
+    unreachable;
+}
+
 fn setup_syscall() void {
     // Enable syscall / sysret
     EFER.write(EFER.read() | 1);
 
+    main_tss.rsp[0] = 0xffffffff41414141;
     // Setup sysret instruction
     // Stack segment — IA32_STAR[63:48] + 8.
     // Target code segment — Reads a non-NULL selector from IA32_STAR[63:48] + 16.
-    const sysret_selector = @as(u64, user_base.raw | 3);
-    const syscall_selector = @as(u64, null_entry.raw | 0);
+    const sysret_selector = @as(u64, user_code.raw | 3);
+    const syscall_selector = @as(u64, kernel_code.raw | 0);
     IA32_STAR.write((sysret_selector << 48) | (syscall_selector << 32));
+    IA32_LSTAR.write(@ptrToInt(syscall_entry));
 }
 
 pub var null_entry: gdt.SegmentSelector = undefined;
@@ -451,15 +509,17 @@ pub fn init_cpu() !void {
     const Entry = GDT.Entry;
 
     null_entry = main_gdt.add_entry(Entry.nil);
-    kernel_data = main_gdt.add_entry(Entry.KernelData);
+    // kernel data must be just after code - required by syscall instruction
     kernel_code = main_gdt.add_entry(Entry.KernelCode);
+    kernel_data = main_gdt.add_entry(Entry.KernelData);
 
-    // user code must be just after user data, see sysret
+    // user data must be just user code - required by syscall instruction
     user_base = main_gdt.add_entry(Entry.nil);
-    user_data = main_gdt.add_entry(Entry.UserData);
     user_code = main_gdt.add_entry(Entry.UserCode);
+    user_data = main_gdt.add_entry(Entry.UserData);
 
     // Kinda ugly, refactor this
+    logger.log("TSS is at {*}\n", .{&main_tss});
     const tss_base = main_gdt.add_entry(Entry.TaskState(&main_tss)[0]);
     _ = main_gdt.add_entry(Entry.TaskState(&main_tss)[1]);
 

@@ -62,12 +62,11 @@ pub const Info = packed struct {
     framebuffer_type: u8,
 };
 
-var stack: [2 * 0x1000]u8 align(0x10) = undefined;
 pub var mb_phys: ?mm.PhysicalAddress = null;
 
 export fn multiboot_entry(info: u32) callconv(.C) noreturn {
     mb_phys = mm.PhysicalAddress.new(info);
-    @call(.{ .stack = stack[0..] }, x86.boot_entry, .{});
+    @call(.{ .stack = x86.stack[0..] }, x86.boot_entry, .{});
 }
 
 pub fn get_multiboot_memory() ?mm.PhysicalMemoryRange {

@@ -4,11 +4,10 @@ const arch = kernel.arch;
 const mm = kernel.mm;
 
 pub const Task = struct {
-    pub const NextNode = std.TailQueue(void).Node;
-
     regs: arch.TaskRegs,
     next: NextNode,
 
+    pub const NextNode = std.TailQueue(void).Node;
     pub fn create(func: fn () noreturn) !*Task {
         var task = try mm.memoryAllocator().alloc(Task);
         var stack = try mm.memoryAllocator().alloc([0x1000]u8);
