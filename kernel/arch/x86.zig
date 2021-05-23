@@ -72,7 +72,7 @@ pub const InterruptDescriptorTable = packed struct {
             assert(@sizeOf(@This()) == 16);
         }
 
-        pub fn new(addr: u64, code_selector: gdt.SegmentSelector, ist: u3) Entry {
+        pub fn new(addr: u64, code_selector: gdt.SegmentSelector, ist: u3, dpl: u2) Entry {
             return .{
                 .raw = .{
                     .reserved__ = 0,
@@ -80,7 +80,7 @@ pub const InterruptDescriptorTable = packed struct {
                     .offset_high = @intCast(u32, addr >> 32),
                     .offset_mid = @intCast(u16, (addr >> 16) & 0xffff),
                     .ist = 0,
-                    .type_attr = 0b10001110,
+                    .type_attr = 0b10001110 | (@as(u8, dpl) << 5),
                     .selector = code_selector.raw,
                 },
             };
@@ -538,7 +538,8 @@ pub fn init_cpu() !void {
 
     for (exception_stubs) |ptr, i| {
         const addr: u64 = @ptrToInt(ptr);
-        main_idt.set_entry(@intCast(u16, i), IDT.Entry.new(addr, kernel_code, 0));
+        const dpl: u2 = if (i == 3) 3 else 0;
+        main_idt.set_entry(@intCast(u16, i), IDT.Entry.new(addr, kernel_code, 0, dpl));
     }
 
     main_idt.load();
