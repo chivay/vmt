@@ -22,6 +22,13 @@ pub fn panic(msg: []const u8, return_trace: ?*std.builtin.StackTrace) noreturn {
     arch.hang();
 }
 
+var sys_no: u32 = 0;
+pub fn syscall_dispatch() void {
+    logger.log("syscall entry {}\n", .{sys_no});
+    sys_no += 1;
+    task.scheduler().yield();
+}
+
 pub fn getCoreBlock() *arch.CoreBlock {
     return arch.getCoreBlock();
 }
@@ -56,9 +63,11 @@ pub fn kmain() void {
     };
 
     var scheduler = task.scheduler();
+    scheduler.addTask(&task.init_task);
     scheduler.addTask(taskA);
     scheduler.addTask(taskB);
 
+    //arch.enable_interrupts();
     arch.enter_userspace() catch |err| {
         @panic("Failed to enter userspace");
     };

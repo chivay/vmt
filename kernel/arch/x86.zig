@@ -43,6 +43,7 @@ pub fn get_phy_mask() callconv(.Inline) u64 {
 pub const TaskRegs = packed struct {
     // Layout must be kept in sync with asm_switch_stack
     rsp: u64,
+    stack_bottom: u64,
 
     pub fn setup(func: fn () noreturn, thread_stack: []u8) TaskRegs {
         // 7 == #saved registers + return address
@@ -51,7 +52,7 @@ pub const TaskRegs = packed struct {
         var rip_area = reg_area[6 * @sizeOf(u64) ..];
         std.mem.set(u8, reg_area, 0);
         std.mem.writeIntNative(u64, @ptrCast(*[8]u8, rip_area), @ptrToInt(func));
-        return TaskRegs{ .rsp = @ptrToInt(reg_area.ptr) };
+        return TaskRegs{ .rsp = @ptrToInt(reg_area.ptr), .stack_bottom = @ptrToInt(reg_area.ptr) };
     }
 };
 
@@ -184,7 +185,8 @@ pub fn boot_entry() noreturn {
     kernel.logging.register_sink(&vga_node);
     kernel.logging.register_sink(&serial_node);
 
-    kernel.task.init_task.regs.rsp = @ptrToInt(&stack[0]) + stack.len;
+    kernel.task.init_task.regs.rsp = undefined;
+    kernel.task.init_task.regs.stack_bottom = @ptrToInt(&stack[0]) + stack.len;
 
     // setup identity mapping
     const VIRT_START = kernel.mm.VirtualAddress.new(@ptrToInt(&KERNEL_VIRT_BASE));
@@ -441,7 +443,7 @@ const exception_stubs = init: {
 fn syscall_entry() callconv(.Naked) void {
     comptime {
         std.debug.assert(@byteOffsetOf(kernel.task.Task, "regs") == 0);
-        std.debug.assert(@byteOffsetOf(TaskRegs, "rsp") == 0);
+        std.debug.assert(@byteOffsetOf(TaskRegs, "stack_bottom") == 8);
     }
     asm volatile (
         \\ // Switch to kernel GS
@@ -451,7 +453,7 @@ fn syscall_entry() callconv(.Naked) void {
         \\ // Load kernel stack from task
         \\ mov %%gs:0x0, %%rsp // rsp == *CoreBlock
         \\ mov 0(%%rsp), %%rsp // rsp == *Task
-        \\ mov 0(%%rsp), %%rsp // rsp == kernel_rsp
+        \\ mov 8(%%rsp), %%rsp // rsp == kernel_rsp
         \\ push %%rcx
         \\ push %%r11
         \\ call handle_syscall
@@ -465,7 +467,7 @@ fn syscall_entry() callconv(.Naked) void {
 }
 
 export fn handle_syscall() callconv(.C) u64 {
-    logger.log("Hello from syscall\n", .{});
+    kernel.syscall_dispatch();
     return 0;
 }
 
