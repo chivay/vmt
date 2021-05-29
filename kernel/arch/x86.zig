@@ -17,6 +17,7 @@ pub const apic = @import("x86/apic.zig");
 pub const trampoline = @import("x86/trampoline.zig");
 pub const smp = @import("x86/smp.zig");
 pub const gdt = @import("x86/gdt.zig");
+pub const pit = @import("x86/pit.zig");
 
 comptime {
     // Force multiboot evaluation to make multiboot_entry present
@@ -403,6 +404,43 @@ fn keyboard_echo() void {
     pic.Master.send_eoi();
 }
 
+pub const IrqRegistration = struct {
+    func: fn () void,
+    next: ?*IrqRegistration,
+};
+
+var handlers = [_]?*IrqRegistration{null} ** 256;
+
+pub fn register_irq_handler(irq: u8, reg: *IrqRegistration) !void {
+    if (handlers[irq]) |registration| {
+        reg.next = registration;
+        handlers[irq] = reg;
+    }
+    handlers[irq] = reg;
+}
+
+pub fn unregister_irq_handler(irq: u8, reg: *IrqRegistration) !void {
+    var current = handlers[irq];
+    if (current) |registration| {
+        if (registration == reg) {
+            handlers[irq] = reg.next;
+            reg.next = null;
+            return;
+        }
+    }
+
+    while (current) |registation| {
+        if (registation.next) |next_registration| {
+            if (next_registration == reg) {
+                registation.next = reg.next;
+                reg.next = null;
+                return;
+            }
+        }
+    }
+    @panic("Tried to unregister invalid registration");
+}
+
 export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFrame) callconv(.C) void {
     switch (interrupt_num) {
         @enumToInt(CpuException.Breakpoint) => {
@@ -423,8 +461,13 @@ export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFra
             hang();
         },
         else => {
-            logger.log("Received unknown interrupt {}\n", .{interrupt_num});
-            hang();
+            //logger.log("Received unknown interrupt {}\n", .{interrupt_num});
+            var handler = handlers[interrupt_num];
+            while (handler) |registration| {
+                registration.func();
+                handler = registration.next;
+            }
+            pic.Master.send_eoi();
         },
     }
 }
@@ -509,6 +552,15 @@ pub var user_base: gdt.SegmentSelector = undefined;
 pub var user_code: gdt.SegmentSelector = undefined;
 pub var user_data: gdt.SegmentSelector = undefined;
 
+pub const IRQ_0 = 0x30;
+pub const IRQ_8 = 0x38;
+
+pub fn init_pic() void {
+    pic.remap(IRQ_0, IRQ_8);
+    pic.Master.data_write(0x00);
+    pic.Slave.data_write(0x00);
+}
+
 pub fn init_cpu() !void {
     cpu_phys_bits = get_maxphyaddr();
     const Entry = GDT.Entry;
@@ -552,13 +604,11 @@ pub fn init_cpu() !void {
 
     setup_syscall();
 
-    //pic.remap(0x30, 0x38);
-    //// enable only keyboard interrupt
-    //pic.Master.data_write(0xfd);
-    //pic.Slave.data_write(0xff);
+    init_pic();
 }
 
 pub fn init() void {
+    pit.init();
     trampoline.init();
     acpi.init();
     apic.init();
