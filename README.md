@@ -4,6 +4,10 @@
 Toy OS written in Zig ;)
 Requires Zig from master.
 
+## Contribute
+
+Send your patches to `~chivay/public-inbox@lists.sr.ht`
+
 ## How to
 ```bash
 $ zig build qemu
