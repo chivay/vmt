@@ -36,18 +36,18 @@ pub fn intToEnumSafe(comptime T: type, value: std.meta.Tag(T)) ?T {
     return null;
 }
 
-pub fn KiB(bytes: u64) callconv(.Inline) u64 {
+pub inline fn KiB(bytes: u64) u64 {
     return bytes * 1024;
 }
 
-pub fn MiB(bytes: u64) callconv(.Inline) u64 {
+pub inline fn MiB(bytes: u64) u64 {
     return KiB(bytes) * 1024;
 }
 
-pub fn GiB(bytes: u64) callconv(.Inline) u64 {
+pub inline fn GiB(bytes: u64) u64 {
     return MiB(bytes) * 1024;
 }
 
-pub fn TiB(bytes: u64) callconv(.Inline) u64 {
+pub inline fn TiB(bytes: u64) u64 {
     return GiB(bytes) * 1024;
 }

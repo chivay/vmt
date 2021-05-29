@@ -35,7 +35,7 @@ pub var main_idt align(64) = std.mem.zeroes(IDT);
 /// Physical-address width supported by the processor. <= 52
 pub var cpu_phys_bits: u6 = undefined;
 
-pub fn get_phy_mask() callconv(.Inline) u64 {
+pub inline fn get_phy_mask() u64 {
     const one: u64 = 1;
     return @shlExact(one, cpu_phys_bits) - 1;
 }
@@ -146,10 +146,10 @@ pub fn syscall_supported() bool {
 
 pub fn MSR(n: u32) type {
     return struct {
-        pub fn read() callconv(.Inline) u64 {
+        pub inline fn read() u64 {
             return rdmsr(n);
         }
-        pub fn write(value: u64) callconv(.Inline) void {
+        pub inline fn write(value: u64) void {
             wrmsr(n, value);
         }
     };
@@ -306,7 +306,7 @@ var boot_cpu_gsstruct: GSStruct = GSStruct{
     .scratch_space = 0,
 };
 
-pub fn getCoreBlock() callconv(.Inline) *CoreBlock {
+pub inline fn getCoreBlock() *CoreBlock {
     const blockptr = asm volatile ("mov %%gs:0x0,%[ret]"
         : [ret] "={rax}" (-> u64)
     );
