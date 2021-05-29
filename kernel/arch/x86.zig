@@ -117,6 +117,18 @@ pub const InterruptFrame = packed struct {
     comptime {
         assert(@sizeOf(InterruptFrame) == 40);
     }
+
+    pub fn format(
+        self: InterruptFrame,
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = try writer.write("InterruptFrame{");
+        _ = try writer.print("rip={x}:{x}", .{ self.cs, self.rip });
+        _ = try writer.print(" rsp={x}:{x}", .{ self.ss, self.rsp });
+        _ = try writer.write("}");
+    }
 };
 
 pub fn get_vendor_string() [12]u8 {
