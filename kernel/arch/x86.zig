@@ -439,6 +439,7 @@ comptime {
         \\ pop %rdx
         \\ pop %rcx
         \\ pop %rax
+        \\ ret
     );
 }
 
