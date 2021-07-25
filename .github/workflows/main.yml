@@ -19,6 +19,7 @@ jobs:
             experimental-features = nix-command flakes ca-references
       - uses: cachix/cachix-action@v10
         with:
-          name: zig-nightly
+          name: vmt
+          extraPullNames: zig-nightly
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - run: nix build .#vmt
