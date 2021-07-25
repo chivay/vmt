@@ -103,9 +103,10 @@ fn AddrWrapper(comptime name: []const u8, comptime T: type) type {
         }
 
         pub fn format(self: Self, fmt: []const u8, options: std.fmt.FormatOptions, stream: anytype) !void {
+            _ = fmt;
             try stream.writeAll(name);
             try stream.writeAll("{");
-            try std.fmt.formatInt(self.value, 16, false, options, stream);
+            try std.fmt.formatInt(self.value, 16, .lower, options, stream);
             try stream.writeAll("}");
         }
 
@@ -245,7 +246,7 @@ pub const MemoryAllocator = struct {
         const buffer = try self.alloc_bytes(@sizeOf(T));
         return @ptrCast(*T, buffer);
     }
-    pub fn free(chunk: *u8) void {}
+    pub fn free(_: *u8) void {}
 };
 
 pub const FrameAllocator = struct {

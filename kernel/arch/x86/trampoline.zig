@@ -28,7 +28,7 @@ pub fn get_nth_section(header: *const elf.Header, file: anytype, idx: u16) ?elf.
 
 pub fn getString(idx: u32) ?[]const u8 {
     var fbs = std.io.fixedBufferStream(trampoline_elf);
-    const header = elf.Header.read(&fbs) catch |err| {
+    const header = elf.Header.read(&fbs) catch {
         @panic("Invalid ELF header");
     };
     const section = find_section_by_name(&header, &fbs, ".strtab").?;
@@ -47,7 +47,7 @@ pub fn getString(idx: u32) ?[]const u8 {
 
 pub fn getSymbol(idx: u32) ?elf.Elf64_Sym {
     var fbs = std.io.fixedBufferStream(trampoline_elf);
-    const header = elf.Header.read(&fbs) catch |err| {
+    const header = elf.Header.read(&fbs) catch {
         @panic("Invalid ELF header");
     };
     const section = find_section_by_name(&header, &fbs, ".symtab").?;
@@ -70,7 +70,6 @@ pub fn getSymbol(idx: u32) ?elf.Elf64_Sym {
 }
 
 pub fn find_section_by_name(header: *const elf.Header, file: anytype, name: []const u8) ?elf.Elf64_Shdr {
-    const name_sections = header.shstrndx;
     const section = get_nth_section(header, file, header.shstrndx).?;
     var buffer: [0x100]u8 = undefined;
     file.seekableStream().seekTo(section.sh_offset) catch unreachable;
@@ -93,7 +92,7 @@ pub fn find_section_by_name(header: *const elf.Header, file: anytype, name: []co
 
 pub fn getSectionByName(name: []const u8) ?elf.Elf64_Shdr {
     var fbs = std.io.fixedBufferStream(trampoline_elf);
-    const header = elf.Header.read(&fbs) catch |err| {
+    const header = elf.Header.read(&fbs) catch {
         @panic("Invalid ELF header");
     };
     return find_section_by_name(&header, &fbs, name);

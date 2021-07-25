@@ -46,8 +46,6 @@ fn waitUntilBooted() void {
 }
 
 fn apEntry() callconv(.C) noreturn {
-    const apic_id = x86.apic.getLapicId();
-
     x86.main_gdt.load();
     x86.set_ds(x86.null_entry.raw);
     x86.set_es(x86.null_entry.raw);
@@ -215,11 +213,11 @@ pub fn init() void {
         phys_start,
         PAGE_SIZE,
         mm.VirtualMemory.Protection.RWX,
-    ) catch |err| {
+    ) catch {
         logger.err("Failed to map AP memory");
         return;
     };
-    defer mm.kernel_vm.unmap(trampoline) catch |err| {
+    defer mm.kernel_vm.unmap(trampoline) catch {
         @panic("Failed to unmap AP memory");
     };
 

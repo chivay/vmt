@@ -54,8 +54,6 @@ pub fn init() void {
 
     const id_register = lapic.Reg(u32, 0x20);
     const version_register = lapic.Reg(u32, 0x30);
-    const error_status = lapic.Reg(u32, 0x280);
-    const svr = lapic.Reg(u32, 0xf0);
 
     logger.debug("ID reg: {x}\n", .{id_register.read()});
     logger.debug("Version: {x}\n", .{version_register.read() & 0xff});

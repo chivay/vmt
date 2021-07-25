@@ -23,12 +23,6 @@ const KERNEL_MEMORY_MAP = [_]mm.VirtualMemoryRange{
     KERNEL_IMAGE,
 };
 
-comptime {
-    // Check for overlaps
-    var slots = KERNEL_MEMORY_MAP.len;
-    var i = 0;
-}
-
 const DIRECT_MAPPING = mm.VirtualMemoryRange.sized(
     VirtualAddress.new(0xffff800000000000),
     lib.GiB(64),
@@ -161,7 +155,7 @@ pub const VirtualMemoryImpl = struct {
 
         const pdpt = self.pml4.get_pdpt(pml4_index) orelse return Error.MappingNotExists;
         const pd = pdpt.get_pd(pdpt_index) orelse return Error.MappingNotExists;
-        const pt = pd.get_pt(pdpt_index) orelse return Error.MappingNotExists;
+        const pt = pd.get_pt(pd_index) orelse return Error.MappingNotExists;
 
         if (pt.get_page(pt_index)) |page| {
             pt.set_entry(pt_index, 0);
@@ -367,7 +361,7 @@ pub const VirtualMemoryImpl = struct {
                     if (!left.base.isAligned(lib.KiB(4))) {
                         left.base.value = std.mem.alignBackward(left.base.value, lib.KiB(4));
                     }
-                    const page = self.unmap_page_4kb(left.base) catch |err| {
+                    _ = self.unmap_page_4kb(left.base) catch |err| {
                         logger.err("Failed to unmap 4KiB page at {}\n", left.base);
                         return err;
                     };
@@ -377,7 +371,7 @@ pub const VirtualMemoryImpl = struct {
                     if (!left.base.isAligned(lib.MiB(2))) {
                         left.base.value = std.mem.alignBackward(left.base.value, lib.MiB(2));
                     }
-                    const page = self.unmap_page_2mb(left.base) catch |err| {
+                    _ = self.unmap_page_2mb(left.base) catch |err| {
                         logger.err("Failed to unmap 2MiB page at {}\n", left.base);
                         return err;
                     };
@@ -461,11 +455,11 @@ pub fn init() void {
     // Initialize physical memory allocator
     main_allocator = mm.FrameAllocator.new(adjusted_memory);
     // Initialize x86 VM implementation
-    kernel_vm_impl = VirtualMemoryImpl.init(&main_allocator) catch |err| {
+    kernel_vm_impl = VirtualMemoryImpl.init(&main_allocator) catch {
         @panic("Failed to initialize VM implementation");
     };
 
-    setup_kernel_vm() catch |err| {
+    setup_kernel_vm() catch {
         @panic("Failed to initialize kernel VM implementation");
     };
 

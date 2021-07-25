@@ -30,11 +30,11 @@ pub fn printk(comptime fmt: []const u8, args: anytype) void {
     defer lock.release();
 
     fbs.reset();
-    std.fmt.format(out_stream, fmt, args) catch |err| {};
+    std.fmt.format(out_stream, fmt, args) catch {};
     do_printk(fbs.getWritten());
 }
 
-pub const LogLevel = enum {
+pub const LogLevel = enum(u8) {
     Critical = 0,
     Error = 1,
     Warning = 2,

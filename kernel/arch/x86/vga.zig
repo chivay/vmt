@@ -19,7 +19,7 @@ pub const VGADevice = struct {
 
     const Buffer = [VGA_HEIGHT][VGA_WIDTH]u16;
 
-    const Color = packed enum(u4) {
+    const Color = enum(u4) {
         Black = 0,
         Blue = 1,
         Green = 2,

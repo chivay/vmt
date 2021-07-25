@@ -116,7 +116,7 @@ pub fn GlobalDescriptorTable(n: u16) type {
             x86.lgdt(@ptrToInt(&descriptor));
         }
 
-        pub fn reload_cs(self: Self, selector: SegmentSelector) void {
+        pub fn reload_cs(_: Self, selector: SegmentSelector) void {
             __reload_cs(selector.raw);
         }
     };

@@ -11,7 +11,7 @@ const Task = task.Task;
 
 pub const logger = logging.logger("kernel"){};
 
-pub fn panic(msg: []const u8, return_trace: ?*std.builtin.StackTrace) noreturn {
+pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace) noreturn {
     logger.critical("PANIK: {s}\n", .{msg});
 
     var it = std.debug.StackIterator.init(@returnAddress(), null);
@@ -48,17 +48,17 @@ pub fn worker2() noreturn {
 }
 
 pub fn kmain() void {
-    arch.init_cpu() catch |err| {
+    arch.init_cpu() catch {
         @panic("Failed to initialize the CPU");
     };
 
     mm.init();
     arch.init();
 
-    var taskA = Task.create(worker) catch |err| {
+    var taskA = Task.create(worker) catch {
         @panic("Failed to allocate a task");
     };
-    var taskB = Task.create(worker2) catch |err| {
+    var taskB = Task.create(worker2) catch {
         @panic("Failed to allocate a task");
     };
 
@@ -68,7 +68,7 @@ pub fn kmain() void {
     scheduler.addTask(taskB);
 
     //arch.enable_interrupts();
-    arch.enter_userspace() catch |err| {
+    arch.enter_userspace() catch {
         @panic("Failed to enter userspace");
     };
 }

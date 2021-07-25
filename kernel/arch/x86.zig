@@ -73,7 +73,7 @@ pub const InterruptDescriptorTable = packed struct {
             assert(@sizeOf(@This()) == 16);
         }
 
-        pub fn new(addr: u64, code_selector: gdt.SegmentSelector, ist: u3, dpl: u2) Entry {
+        pub fn new(addr: u64, code_selector: gdt.SegmentSelector, _: u3, dpl: u2) Entry {
             return .{
                 .raw = .{
                     .reserved__ = 0,
@@ -124,6 +124,8 @@ pub const InterruptFrame = packed struct {
         options: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
+        _ = fmt;
+        _ = options;
         _ = try writer.write("InterruptFrame{");
         _ = try writer.print("rip={x}:{x}", .{ self.cs, self.rip });
         _ = try writer.print(" rsp={x}:{x}", .{ self.ss, self.rsp });
@@ -177,11 +179,11 @@ pub const GSBASE = MSR(0xC000_0101);
 pub const KERNEL_GSBASE = MSR(0xC000_0102);
 
 fn format_to_vga(buffer: []const u8) void {
-    vga.getConsole().writer().writeAll(buffer) catch |err| {};
+    vga.getConsole().writer().writeAll(buffer) catch {};
 }
 
 fn format_to_com1(buffer: []const u8) void {
-    serial.SerialPort(1).writer().writeAll(buffer) catch |err| {};
+    serial.SerialPort(1).writer().writeAll(buffer) catch {};
 }
 
 const Node = kernel.logging.SinkNode;
@@ -228,7 +230,7 @@ pub fn enable_interrupts() void {
 pub fn enter_userspace() !void {
     const frame = try kernel.mm.frameAllocator().alloc_zero_frame();
     const userspace_location = 0x1337000;
-    const range = try kernel.mm.kernel_vm.map_memory(
+    _ = try kernel.mm.kernel_vm.map_memory(
         kernel.mm.VirtualAddress.new(userspace_location),
         frame,
         0x1000,
@@ -330,7 +332,7 @@ fn exception_stub(comptime n: u8) InterruptStub {
     // Have to bump this, otherwise compilation fails
     @setEvalBranchQuota(2000);
     comptime var buffer = std.mem.zeroes([3]u8);
-    comptime var l = std.fmt.formatIntBuf(buffer[0..], n, 10, false, std.fmt.FormatOptions{});
+    _ = std.fmt.formatIntBuf(buffer[0..], n, 10, .lower, std.fmt.FormatOptions{});
 
     // Can I return function directly?
     return struct {
@@ -344,7 +346,43 @@ fn exception_stub(comptime n: u8) InterruptStub {
             }
 
             // Push interrupt number
-            asm volatile ("push $" ++ buffer);
+            asm volatile (".byte 0x6a");
+            switch (n) {
+                0 => asm volatile (".byte 0x0"),
+                1 => asm volatile (".byte 0x1"),
+                2 => asm volatile (".byte 0x2"),
+                3 => asm volatile (".byte 0x3"),
+                4 => asm volatile (".byte 0x4"),
+                5 => asm volatile (".byte 0x5"),
+                6 => asm volatile (".byte 0x6"),
+                7 => asm volatile (".byte 0x7"),
+                8 => asm volatile (".byte 0x8"),
+                9 => asm volatile (".byte 0x9"),
+                10 => asm volatile (".byte 0xa"),
+                11 => asm volatile (".byte 0xb"),
+                12 => asm volatile (".byte 0xc"),
+                13 => asm volatile (".byte 0xd"),
+                14 => asm volatile (".byte 0xe"),
+                15 => asm volatile (".byte 0xf"),
+                16 => asm volatile (".byte 0x10"),
+                17 => asm volatile (".byte 0x11"),
+                18 => asm volatile (".byte 0x12"),
+                19 => asm volatile (".byte 0x13"),
+                20 => asm volatile (".byte 0x14"),
+                21 => asm volatile (".byte 0x15"),
+                22 => asm volatile (".byte 0x16"),
+                23 => asm volatile (".byte 0x17"),
+                24 => asm volatile (".byte 0x18"),
+                25 => asm volatile (".byte 0x19"),
+                26 => asm volatile (".byte 0x1a"),
+                27 => asm volatile (".byte 0x1b"),
+                28 => asm volatile (".byte 0x1c"),
+                29 => asm volatile (".byte 0x1d"),
+                30 => asm volatile (".byte 0x1e"),
+                31 => asm volatile (".byte 0x1f"),
+                32 => asm volatile (".byte 0x20"),
+                else => asm volatile (".byte 0x0"),
+            }
 
             // Call common interrupt entry
             asm volatile ("call common_entry");
@@ -359,49 +397,48 @@ fn exception_stub(comptime n: u8) InterruptStub {
     }.f;
 }
 
-export fn common_entry() callconv(.Naked) void {
-    asm volatile (
-        \\ push %%rax
-        \\ push %%rcx
-        \\ push %%rdx
-        \\ push %%rdi
-        \\ push %%rsi
-        \\ push %%r8
-        \\ push %%r9
-        \\ push %%r10
-        \\ push %%r11
-    );
-    // Stack layout:
-    // [interrupt frame]
-    // [error code]
-    // [interrupt number]
-    // [return address to stub]
-    // [saved rax]
-    // [saved rcx]
-    // [saved rdx]
-    // [saved rdi]
-    // [saved rsi]
-    // [saved  r8]
-    // [saved  r9]
-    // [saved r10]
-    // [saved r11] <- rsp
-    asm volatile (
-        \\ xor %%edi, %%edi
-        \\ movb 80(%%rsp), %%dil # load u8 interrupt number
-        \\ movl 88(%%rsp), %%esi # load error code
-        \\ lea 96(%%rsp), %%rdx
+comptime {
+    asm (
+        \\.global common_entry;
+        \\.type common_entry, @function;
+        \\ common_entry:
+        \\ push %rax
+        \\ push %rcx
+        \\ push %rdx
+        \\ push %rdi
+        \\ push %rsi
+        \\ push %r8
+        \\ push %r9
+        \\ push %r10
+        \\ push %r11
+        \\ // Stack layout:
+        \\ // [interrupt frame]
+        \\ // [error code]
+        \\ // [interrupt number]
+        \\ // [return address to stub]
+        \\ // [saved rax]
+        \\ // [saved rcx]
+        \\ // [saved rdx]
+        \\ // [saved rdi]
+        \\ // [saved rsi]
+        \\ // [saved  r8]
+        \\ // [saved  r9]
+        \\ // [saved r10]
+        \\ // [saved r11] <- rsp
+        \\ xor %edi, %edi
+        \\ movb 80(%rsp), %dil // load u8 interrupt number
+        \\ movl 88(%rsp), %esi // load error code
+        \\ lea 96(%rsp), %rdx
         \\ call hello_handler
-    );
-    asm volatile (
-        \\ pop %%r11
-        \\ pop %%r10
-        \\ pop %%r9
-        \\ pop %%r8
-        \\ pop %%rsi
-        \\ pop %%rdi
-        \\ pop %%rdx
-        \\ pop %%rcx
-        \\ pop %%rax
+        \\ pop %r11
+        \\ pop %r10
+        \\ pop %r9
+        \\ pop %r8
+        \\ pop %rsi
+        \\ pop %rdi
+        \\ pop %rdx
+        \\ pop %rcx
+        \\ pop %rax
     );
 }
 
@@ -416,6 +453,7 @@ fn keyboard_echo() void {
 }
 
 export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFrame) callconv(.C) void {
+    _ = error_code;
     switch (interrupt_num) {
         @enumToInt(CpuException.Breakpoint) => {
             logger.log("BREAKPOINT\n", .{});
@@ -454,8 +492,8 @@ const exception_stubs = init: {
 
 fn syscall_entry() callconv(.Naked) void {
     comptime {
-        std.debug.assert(@byteOffsetOf(kernel.task.Task, "regs") == 0);
-        std.debug.assert(@byteOffsetOf(TaskRegs, "stack_bottom") == 8);
+        std.debug.assert(@offsetOf(kernel.task.Task, "regs") == 0);
+        std.debug.assert(@offsetOf(TaskRegs, "stack_bottom") == 8);
     }
     asm volatile (
         \\ // Switch to kernel GS
@@ -478,6 +516,12 @@ fn syscall_entry() callconv(.Naked) void {
     );
 }
 
+comptime {
+    asm (
+        \\.global handle_syscall;
+        \\.type handle_syscall, @function;
+    );
+}
 export fn handle_syscall() callconv(.C) u64 {
     kernel.syscall_dispatch();
     return 0;

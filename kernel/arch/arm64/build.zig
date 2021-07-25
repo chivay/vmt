@@ -13,7 +13,7 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
         .abi = std.Target.Abi.none,
     };
     kernel.addAssemblyFile("kernel/arch/arm64/boot.S");
-    kernel.setLinkerScriptPath("kernel/arch/arm64/layout.ld");
+    kernel.setLinkerScriptPath(.{ .path = "kernel/arch/arm64/layout.ld" });
     kernel.code_model = std.builtin.CodeModel.small;
     kernel.setTarget(cross_target);
     kernel.setOutputDir("build/arm64");

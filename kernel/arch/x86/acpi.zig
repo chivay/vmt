@@ -64,12 +64,12 @@ comptime {
     const Struct = RSDP;
     // Zig compiler is a little broken for packed structs :<
     //std.debug.assert(@sizeOf(Struct) == 36);
-    std.debug.assert(@byteOffsetOf(Struct, "signature") == 0);
-    std.debug.assert(@byteOffsetOf(Struct, "checksum") == 8);
-    std.debug.assert(@byteOffsetOf(Struct, "oemid") == 9);
-    std.debug.assert(@byteOffsetOf(Struct, "revision") == 15);
-    std.debug.assert(@byteOffsetOf(Struct, "rsdt_address") == 16);
-    std.debug.assert(@byteOffsetOf(Struct, "length") == 20);
+    std.debug.assert(@offsetOf(Struct, "signature") == 0);
+    std.debug.assert(@offsetOf(Struct, "checksum") == 8);
+    std.debug.assert(@offsetOf(Struct, "oemid") == 9);
+    std.debug.assert(@offsetOf(Struct, "revision") == 15);
+    std.debug.assert(@offsetOf(Struct, "rsdt_address") == 16);
+    std.debug.assert(@offsetOf(Struct, "length") == 20);
 }
 
 const SDTHeader = packed struct {
@@ -89,15 +89,15 @@ const SDTHeader = packed struct {
 comptime {
     const Struct = SDTHeader;
     std.debug.assert(@sizeOf(Struct) == 36);
-    std.debug.assert(@byteOffsetOf(Struct, "signature") == 0);
-    std.debug.assert(@byteOffsetOf(Struct, "length") == 4);
-    std.debug.assert(@byteOffsetOf(Struct, "revision") == 8);
-    std.debug.assert(@byteOffsetOf(Struct, "checksum") == 9);
-    std.debug.assert(@byteOffsetOf(Struct, "oemid_a") == 10);
-    std.debug.assert(@byteOffsetOf(Struct, "oemtableid") == 16);
-    std.debug.assert(@byteOffsetOf(Struct, "oemrevision") == 24);
-    std.debug.assert(@byteOffsetOf(Struct, "creatorid") == 28);
-    std.debug.assert(@byteOffsetOf(Struct, "creatorrevision") == 32);
+    std.debug.assert(@offsetOf(Struct, "signature") == 0);
+    std.debug.assert(@offsetOf(Struct, "length") == 4);
+    std.debug.assert(@offsetOf(Struct, "revision") == 8);
+    std.debug.assert(@offsetOf(Struct, "checksum") == 9);
+    std.debug.assert(@offsetOf(Struct, "oemid_a") == 10);
+    std.debug.assert(@offsetOf(Struct, "oemtableid") == 16);
+    std.debug.assert(@offsetOf(Struct, "oemrevision") == 24);
+    std.debug.assert(@offsetOf(Struct, "creatorid") == 28);
+    std.debug.assert(@offsetOf(Struct, "creatorrevision") == 32);
 }
 
 const FADTData = packed struct {
@@ -257,13 +257,6 @@ pub const MADTIterator = struct {
     pub fn init(header: *SDTHeader) MADTIterator {
         const data_length = header.length - @sizeOf(SDTHeader);
         var data = @intToPtr([*]u8, @ptrToInt(header) + @sizeOf(SDTHeader))[0..data_length];
-
-        var madt_info_slice = data[0..@sizeOf(MADTInfo)];
-
-        const madt_info: *MADTInfo = @ptrCast(*MADTInfo, madt_info_slice);
-        //logger.log("{x}\n", .{madt_info});
-
-        var madt_header: *MADTHeader = undefined;
         var entry_data = data[@sizeOf(MADTInfo)..];
 
         return .{ .data = entry_data };
