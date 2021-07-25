@@ -2,7 +2,7 @@
 ![CI](https://github.com/chivay/vmt/workflows/CI/badge.svg)
 
 Toy OS written in Zig ;)
-Requires Zig>=0.8.0.
+Requires Zig>=0.9.0.
 
 ## Contribute
 
