@@ -13,6 +13,21 @@
           zig = zig-nightly.defaultPackage.${system};
       in
         {
+          packages.vmt = pkgs.stdenv.mkDerivation {
+            name = "vmt";
+            nativeBuildInputs = [ zig ];
+            src = self;
+
+            buildPhase = ''
+            export HOME=$TMPDIR;
+            zig build kernel
+            '';
+
+            installPhase = ''
+            cp -r ./build/x86_64/kernel $out
+            '';
+
+          };
           devShell = pkgs.mkShell { buildInputs = [ zig ]; };
         }
       );
