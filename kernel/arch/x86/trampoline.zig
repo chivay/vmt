@@ -74,7 +74,7 @@ pub fn find_section_by_name(header: *const elf.Header, file: anytype, name: []co
     var buffer: [0x100]u8 = undefined;
     file.seekableStream().seekTo(section.sh_offset) catch unreachable;
     file.reader().readNoEof(&buffer) catch unreachable;
-    var name_it = std.mem.split(buffer[0..section.sh_size], "\x00");
+    var name_it = std.mem.split(u8, buffer[0..section.sh_size], "\x00");
 
     var i: u16 = 0;
     while (true) : (i += 1) {

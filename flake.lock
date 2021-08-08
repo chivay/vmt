@@ -72,11 +72,11 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1627235576,
-        "narHash": "sha256-X6z17YdOS/5Kr9J9o+RNWzaqZQLYa8NiYNEJtggffvU=",
+        "lastModified": 1628380910,
+        "narHash": "sha256-6mLmA5xfvzIJHn6ZsJCgHMiKP4GzmpNpP6tmbeyUUUg=",
         "owner": "chivay",
         "repo": "zig-nightly",
-        "rev": "9855ce73091b9098525ef35398fa2b1304a58b82",
+        "rev": "57397b077b4cbf4846dbb0c52890ad0c3e0dda5d",
         "type": "github"
       },
       "original": {
