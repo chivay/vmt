@@ -49,7 +49,6 @@ pub const Scheduler = struct {
 
         self.addTask(core_block.current_task);
         switch_task(prev_task, next_task);
-        @panic("Opanie");
     }
 };
 
