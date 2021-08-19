@@ -21,29 +21,39 @@ SECTIONS
     .boot.text : { *(.boot.text) } :boot
     .boot.data : { *(.boot.data) } :boot
     .boot.bss : { *(.boot.bss) } :boot
-    . = ALIGN(0x1000);
     kernel_boot_end = .;
 
-
     . += KERNEL_VIRT_BASE;
-    .text : AT(kernel_boot_end) ALIGN(0x1000)
+
+    . = ALIGN(0x1000);
+    .text : AT(kernel_boot_end)
     {
         *(.text)
         *(.text.*)
     } :text
-    .rodata : AT((LOADADDR(.text) + SIZEOF(.text) + 0xFFF) & 0xFFFFFFFFFFFFF000) ALIGN(0x1000)
+
+    . = ALIGN(0x1000);
+    .rodata : AT(ADDR(.rodata) - KERNEL_VIRT_BASE)
     { 
         *(.rodata)
         *(.rodata.*)
     } :rodata
 
-    .data : AT((LOADADDR(.rodata) + SIZEOF(.rodata) + 0xFFF) & 0xFFFFFFFFFFFFF000) ALIGN(0x1000)
+    .debuginfo : AT(ADDR(.debuginfo) - KERNEL_VIRT_BASE)
+    { 
+        *(.rodata)
+        *(.rodata.*)
+    } :rodata
+
+    . = ALIGN(0x1000);
+    .data : AT(ADDR(.data) - KERNEL_VIRT_BASE)
     {
         *(.data)
         *(.data.*)
     } :data
 
-    .bss : AT((LOADADDR(.data) + SIZEOF(.data) + 0xFFF) & 0xFFFFFFFFFFFFF000) ALIGN(0x1000)
+    . = ALIGN(0x1000);
+    .bss : AT(ADDR(.bss) - KERNEL_VIRT_BASE)
     {
         *(.bss)
         *(.bss.*)
