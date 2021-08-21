@@ -18,6 +18,7 @@ pub fn frameAllocator() *FrameAllocator {
 }
 
 const Dumper = struct {
+    const Self = @This();
     const Mapping = struct {
         virt: VirtualAddress,
         phys: PhysicalAddress,
@@ -26,7 +27,7 @@ const Dumper = struct {
 
     prev: ?Mapping = null,
 
-    pub fn walk(self: *@This(), virt: VirtualAddress, phys: PhysicalAddress, page_size: usize) void {
+    pub fn walk(self: *Self, virt: VirtualAddress, phys: PhysicalAddress, page_size: usize) void {
         if (self.prev == null) {
             self.prev = Mapping{ .virt = virt, .phys = phys, .size = page_size };
             return;
