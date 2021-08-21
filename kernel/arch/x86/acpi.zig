@@ -301,7 +301,10 @@ const SDTIterator = struct {
 };
 
 pub fn iterSDT() SDTIterator {
-    return SDTIterator.init(rsdt_root);
+    if (rsdt_root) |root| {
+        return SDTIterator.init(root);
+    }
+    return SDTIterator{ .data = &[_]u8{} };
 }
 
 pub fn getTable(name: []const u8) ?*SDTHeader {
@@ -314,7 +317,7 @@ pub fn getTable(name: []const u8) ?*SDTHeader {
     return null;
 }
 
-var rsdt_root: *SDTHeader = undefined;
+var rsdt_root: ?*SDTHeader = null;
 
 pub fn init() void {
     logger.log("Initializing ACPI\n", .{});
