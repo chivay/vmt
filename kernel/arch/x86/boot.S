@@ -2,20 +2,6 @@
 # Misc constants
 .set IA32_EFER, 0xC0000080
 
-# Multiboot constants
-.set MBALIGN,  1<<0
-.set MEMINFO,  1<<1
-.set FLAGS,  MBALIGN | MEMINFO
-.set MAGIC,  0x1BADB002
-.set CHECKSUM, -(MAGIC + FLAGS)
-
-
-.section .multiboot, "a"
-.align 4
-.long MAGIC
-.long FLAGS
-.long CHECKSUM
-
 .section .boot.bss, "a", @nobits
 
 # 4-level paging structure
@@ -95,6 +81,7 @@ multiboot_start:
     # set up stack
 
     movl $boot_stack, %esp
+    push %eax
     call initialize_page_tables
 
     # set PAE - Physical Address Extension bit in CR4
@@ -113,6 +100,7 @@ multiboot_start:
     orl $(1<<31), %eax
     movl %eax, %cr0
 
+    pop %eax
 
     lgdt (GDT64_PTR)
     ljmp $GDT64_CODE_SEG, $START64_ADDR
@@ -163,6 +151,7 @@ start64:
 .type start64, @function
 .set START64_ADDR, start64
     .code64
+    push %rax
 
     mov $GDT64_DATA_SEG, %ax
 
@@ -172,5 +161,7 @@ start64:
     mov %ax, %gs
     mov %ax, %ss
 
+    pop %rax
     mov %ebx, %edi
+    mov %eax, %esi
     jmp multiboot_entry

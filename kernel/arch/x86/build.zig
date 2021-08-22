@@ -33,7 +33,7 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
     };
     kernel.setTarget(cross_target);
     kernel.code_model = std.builtin.CodeModel.kernel;
-    kernel.want_lto = true;
+    kernel.want_lto = false;
 
     kernel.setLinkerScriptPath(.{ .path = "kernel/arch/x86/linker.ld" });
     kernel.addAssemblyFile("kernel/arch/x86/boot.S");
@@ -62,6 +62,8 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
         "-cdrom",
         "build/x86_64/kernel.iso",
         "-s",
+        "-bios",
+        "/usr/share/edk2-ovmf/x64/OVMF.fd",
         "-serial",
         "stdio",
         "-display",

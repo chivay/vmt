@@ -212,6 +212,7 @@ pub fn boot_entry() noreturn {
     logger.debug("Kernel end: {x}\n", .{mm.get_kernel_end()});
 
     logger.info("Booting the kernel...\n", .{});
+    logger.info("Command line: {s}\n", .{multiboot.get_cmdline()});
     kernel.kmain();
 
     hang();

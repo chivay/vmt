@@ -1,109 +1,220 @@
+const std = @import("std");
 const mm = @import("root").mm;
 const x86 = @import("../x86.zig");
 usingnamespace @import("root").lib;
 pub var logger = @TypeOf(x86.logger).childOf(@typeName(@This())){};
 
-pub const AoutSymbolTable = packed struct {
-    tabsize: u32,
-    strsize: u32,
-    addr: u32,
+fn alignTo8(n: usize) usize {
+    const mask = 0b111;
+    return (n - 1 | mask) + 1;
+}
+
+pub const Arch = enum(u32) {
+    I386 = 0,
+    MIPS = 4,
+};
+
+pub const TagType = enum(u32) {
+    End = 0,
+    Cmdline = 1,
+    BootLoaderName = 2,
+    Module = 3,
+    BasicMemInfo = 4,
+    BootDev = 5,
+    Mmap = 6,
+    VBE = 7,
+    Framebuffer = 8,
+    ElfSections = 9,
+    APM = 10,
+    EFI32 = 11,
+    EFI64 = 12,
+    SMBIOS = 13,
+    ACPIOld = 14,
+    ACPINew = 15,
+    Network = 16,
+    EFIMMap = 17,
+    EFIBootServices = 18,
+    EFI32ImageHandle = 19,
+    EFI64ImageHandle = 20,
+    LoadBaseAddr = 21,
+    _,
+
+    pub fn v(self: @This()) u32 {
+        return @enumToInt(self);
+    }
+};
+
+const MULTIBOOT2_MAGIC = 0x36d76289;
+
+pub const Header = packed struct {
+    magic: u32 = MAGIC,
+    architecture: u32,
+    header_length: u32,
+    checksum: u32,
+
+    const MAGIC = 0xE85250D6;
+    pub const Tag = packed struct {
+        typ: u16,
+        flags: u16,
+        size: u32,
+    };
+
+    pub fn init(arch: Arch, length: u32) Header {
+        return .{
+            .architecture = @enumToInt(arch),
+            .header_length = length,
+            .checksum = 0 -% (MAGIC + length + @enumToInt(arch)),
+        };
+    }
+
+    pub const NilTag = packed struct {
+        const field_size = @sizeOf(Tag);
+        tag: Tag = .{
+            .typ = 0,
+            .flags = 0,
+            .size = 8,
+        },
+
+        // Force 8-aligned struct size for each tag
+        _pad: [alignTo8(field_size)]u8 = undefined,
+    };
+
+    pub fn InformationRequestTag(n: u32) type {
+        return packed struct {
+            const field_size = @sizeOf(Tag) + @sizeOf([n]u32);
+            tag: Tag = .{
+                .typ = 1,
+                .flags = 0,
+                .size = @sizeOf(u32) * n + 8,
+            },
+            mbi_tag_types: [n]u32,
+
+            _pad: [alignTo8(field_size)]u8 = undefined,
+        };
+    }
+
+    pub const FramebufferTag = packed struct {
+        const field_size = @sizeOf(Tag) + 3 * @sizeOf(u32);
+
+        tag: Tag = .{
+            .typ = 5,
+            .flags = 0,
+            .size = 20,
+        },
+        width: u32,
+        height: u32,
+        depth: u32,
+
+        _pad: [alignTo8(field_size)]u8 = undefined,
+    };
+};
+
+const info_request_tag = std.mem.toBytes(Header.InformationRequestTag(2){
+    .mbi_tag_types = [_]u32{ TagType.Cmdline.v(), TagType.Framebuffer.v() },
+});
+const framebuffer_tag = std.mem.toBytes(Header.FramebufferTag{
+    .width = 640,
+    .height = 480,
+    .depth = 8,
+});
+const nil_tag = std.mem.toBytes(Header.NilTag{});
+
+const tag_buffer = info_request_tag ++ framebuffer_tag;
+
+const total_size = @sizeOf(Header) + tag_buffer.len + nil_tag.len;
+export const mbheader align(8) linksection(".multiboot") =
+    std.mem.toBytes(Header.init(Arch.I386, total_size)) ++ tag_buffer ++ nil_tag;
+
+const BootInfoStart = packed struct {
+    total_size: u32,
     reserved: u32,
 };
 
-pub const ElfSectionHeaderTable = packed struct {
-    num: u32,
+const BootInfoHeader = packed struct {
+    typ: u32,
     size: u32,
-    addr: u32,
-    shndx: u32,
-};
-
-pub const Info = packed struct {
-    flags: u32,
-
-    mem_lower: u32,
-    mem_uppper: u32,
-
-    boot_device: u32,
-
-    cmdline: u32,
-
-    mods_count: u32,
-    mods_addr: u32,
-
-    u: packed union {
-        aout_sym: AoutSymbolTable,
-        elf_sec: ElfSectionHeaderTable,
-    },
-
-    mmap_length: u32,
-    mmap_addr: u32,
-
-    drives_length: u32,
-    drives_addr: u32,
-
-    config_table: u32,
-
-    boot_loader_name: u32,
-
-    apm_table: u32,
-
-    vbe_control_info: u32,
-    vbe_mode_info: u32,
-    vbe_mode: u16,
-    vbe_interface_seg: u16,
-    vbe_interface_off: u16,
-    vbe_interface_len: u16,
-
-    framebuffer_addr: u64,
-    framebuffer_pitch: u32,
-    framebuffer_width: u32,
-    framebuffer_height: u32,
-    framebuffer_bpp: u8,
-    framebuffer_type: u8,
 };
 
 pub var mb_phys: ?mm.PhysicalAddress = null;
+pub var loader_magic: u32 = undefined;
 
-export fn multiboot_entry(info: u32) callconv(.C) noreturn {
+export fn multiboot_entry(info: u32, magic: u32) callconv(.C) noreturn {
     mb_phys = mm.PhysicalAddress.new(info);
+    loader_magic = magic;
     @call(.{ .stack = x86.stack[0..] }, x86.boot_entry, .{});
 }
 
-pub fn get_multiboot_memory() ?mm.PhysicalMemoryRange {
+fn get_multiboot_tag(tag: TagType) ?[]u8 {
+    if (loader_magic != MULTIBOOT2_MAGIC) {
+        @panic("Not booted by multiboot2 compliant bootloader");
+    }
+
     if (mb_phys) |phys| {
         const mb = mm.directMapping().to_virt(phys);
-        const info = mb.into_pointer(*x86.multiboot.Info);
-        return detect_multiboot_memory(info);
+        const size = mb.into_pointer(*BootInfoStart).total_size;
+
+        // Skip BootInfoStart
+        var buffer = mb.into_pointer([*]u8)[@sizeOf(BootInfoStart)..size];
+
+        // Iterate over multiboot tags
+        var header: *BootInfoHeader = undefined;
+        while (buffer.len > @sizeOf(BootInfoHeader)) : (buffer = buffer[alignTo8(header.size)..]) {
+            const chunk = buffer[0..@sizeOf(BootInfoHeader)];
+            header = std.mem.bytesAsValue(BootInfoHeader, chunk);
+
+            const tagt = @intToEnum(TagType, header.typ);
+            if (tagt == tag) {
+                return buffer[0..header.size];
+            }
+        }
     }
     return null;
 }
 
-fn detect_multiboot_memory(mb_info: *Info) ?mm.PhysicalMemoryRange {
-    if (!bit_set(mb_info.flags, BIT(6))) {
-        @panic("Missing memory map!");
-    }
+pub fn get_multiboot_memory() ?mm.PhysicalMemoryRange {
+    return detect_multiboot_memory();
+}
+
+pub fn get_cmdline() ?[]u8 {
+    var buf: []u8 = get_multiboot_tag(.Cmdline) orelse return null;
+    const CmdlineTag = packed struct {
+        type: u32,
+        size: u32,
+    };
+    buf = buf[@sizeOf(CmdlineTag)..];
+    return buf;
+}
+
+fn detect_multiboot_memory() ?mm.PhysicalMemoryRange {
+    const MemoryMapTag = packed struct {
+        typ: u32,
+        size: u32,
+        entry_size: u32,
+        entry_version: u32,
+    };
+
+    var buf: []u8 = get_multiboot_tag(.Mmap) orelse return null;
+    const tag = std.mem.bytesAsValue(MemoryMapTag, buf[0..@sizeOf(MemoryMapTag)]);
+    buf = buf[@sizeOf(MemoryMapTag)..];
 
     const MemEntry = packed struct {
-        // at -4 offset
-        size: u32,
-        // at 0 offset
         base_addr: u64,
         length: u64,
-        type_: u32,
+        type: u32,
+        reserved: u32,
     };
 
     var best_slot: ?mm.PhysicalMemoryRange = null;
 
-    var offset = mm.PhysicalAddress.new(mb_info.mmap_addr);
-    const mmap_end = mm.PhysicalAddress.new(mb_info.mmap_addr + mb_info.mmap_length);
-
     logger.log("BIOS memory map:\n", .{});
-    while (offset.lt(mmap_end)) {
-        const entry = x86.mm.directMapping().to_virt(offset).into_pointer(*MemEntry);
+
+    const entry_size = tag.entry_size;
+    while (buf.len >= entry_size) : (buf = buf[entry_size..]) {
+        const entry = std.mem.bytesAsValue(MemEntry, buf[0..@sizeOf(MemEntry)]);
 
         const start = entry.base_addr;
         const end = start + entry.length - 1;
-        const status = switch (entry.type_) {
+        const status = switch (entry.type) {
             1 => "Available",
             3 => "ACPI Mem",
             4 => "Preserved on hibernation",
@@ -111,9 +222,8 @@ fn detect_multiboot_memory(mb_info: *Info) ?mm.PhysicalMemoryRange {
             else => "Reserved",
         };
         logger.log("[{x:0>10}-{x:0>10}] {s}\n", .{ start, end, status });
-        offset = offset.add(entry.size + @sizeOf(@TypeOf(entry.size)));
 
-        if (entry.type_ != 1) {
+        if (entry.type != 1) {
             continue;
         }
         const this_slot = mm.PhysicalMemoryRange{
