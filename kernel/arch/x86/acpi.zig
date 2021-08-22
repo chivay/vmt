@@ -308,6 +308,8 @@ pub fn iterSDT() SDTIterator {
 }
 
 pub fn getTable(name: []const u8) ?*SDTHeader {
+    logger.log("Getting table {s}\n", .{name});
+
     var sdt_it = iterSDT();
     while (sdt_it.next()) |table| {
         if (std.mem.eql(u8, name, &table.signature)) {

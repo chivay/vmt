@@ -21,7 +21,7 @@ fn do_printk(buffer: []const u8) void {
     }
 }
 
-var printk_buffer: [0x1000]u8 = undefined;
+var printk_buffer: [0x10000]u8 = undefined;
 var fbs = std.io.fixedBufferStream(&printk_buffer);
 var out_stream = fbs.writer();
 
