@@ -45,6 +45,8 @@ pub const TaskRegs = packed struct {
     rsp: u64,
     stack_bottom: u64,
 
+    const Self = @This();
+
     pub fn setup(func: fn () noreturn, thread_stack: []u8) TaskRegs {
         // 7 == #saved registers + return address
         const reg_area_size = @sizeOf(u64) * 7;
@@ -53,6 +55,14 @@ pub const TaskRegs = packed struct {
         std.mem.set(u8, reg_area, 0);
         std.mem.writeIntNative(u64, @ptrCast(*[8]u8, rip_area), @ptrToInt(func));
         return TaskRegs{ .rsp = @ptrToInt(reg_area.ptr), .stack_bottom = @ptrToInt(reg_area.ptr) };
+    }
+
+    pub fn format(self: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, stream: anytype) !void {
+        _ = fmt;
+        try stream.writeAll(@typeName(Self));
+        try stream.writeAll("{rsp=0x");
+        try std.fmt.formatInt(self.rsp, 16, .lower, options, stream);
+        try stream.writeAll("}");
     }
 };
 
