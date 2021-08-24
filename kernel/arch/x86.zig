@@ -17,6 +17,7 @@ pub const apic = @import("x86/apic.zig");
 pub const trampoline = @import("x86/trampoline.zig");
 pub const smp = @import("x86/smp.zig");
 pub const gdt = @import("x86/gdt.zig");
+pub const framebuffer = @import("x86/framebuffer.zig");
 
 comptime {
     // Force multiboot evaluation to make multiboot_entry present
@@ -638,6 +639,7 @@ pub fn init_cpu() !void {
 }
 
 pub fn init() void {
+    framebuffer.init();
     trampoline.init();
     acpi.init();
     apic.init();

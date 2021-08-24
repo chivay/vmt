@@ -185,6 +185,25 @@ pub fn get_cmdline() ?[]u8 {
     return buf;
 }
 
+pub const MultibootFramebuffer = packed struct {
+    addr: u64,
+    pitch: u32,
+    width: u32,
+    height: u32,
+    bpp: u8,
+    type: u8,
+    reserved: u8,
+};
+
+pub fn get_framebuffer() ?*MultibootFramebuffer {
+    var buf: []u8 = get_multiboot_tag(.Framebuffer) orelse return null;
+    buf = buf[2 * @sizeOf(u32) ..];
+    return std.mem.bytesAsValue(
+        MultibootFramebuffer,
+        buf[0..@sizeOf(MultibootFramebuffer)],
+    );
+}
+
 fn detect_multiboot_memory() ?mm.PhysicalMemoryRange {
     const MemoryMapTag = packed struct {
         typ: u32,
