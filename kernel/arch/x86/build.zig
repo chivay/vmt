@@ -54,6 +54,7 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
     const memory = builder.option([]const u8, "vm-memory", "VM memory e.g. 1G, 128M") orelse "1G";
     const cpus = builder.option([]const u8, "vm-cpus", "number of vCPUs") orelse "1";
     const display = builder.option([]const u8, "qemu-display", "type of QEMU display") orelse "none";
+    const use_uefi = builder.option(bool, "vm-uefi", "use UEFI") orelse true;
 
     var qemu_tls = builder.step("qemu", "Run QEMU");
     var qemu = builder.addSystemCommand(&[_][]const u8{"qemu-system-x86_64"});
@@ -62,8 +63,6 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
         "-cdrom",
         "build/x86_64/kernel.iso",
         "-s",
-        "-bios",
-        "/usr/share/edk2-ovmf/x64/OVMF.fd",
         "-serial",
         "stdio",
         "-display",
@@ -75,6 +74,13 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
         "-smp",
         cpus,
     });
+
+    if (use_uefi) {
+        qemu.addArgs(&[_][]const u8{
+            "-bios",
+            "/usr/share/edk2-ovmf/x64/OVMF.fd",
+        });
+    }
 
     qemu.step.dependOn(&iso.step);
     qemu_tls.dependOn(&qemu.step);
