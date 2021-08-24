@@ -5,13 +5,16 @@ const mm = kernel.mm;
 
 pub const Task = struct {
     regs: arch.TaskRegs,
+    stack: []u8,
     next: NextNode,
 
+    const Self = @This();
     pub const NextNode = std.TailQueue(void).Node;
     pub fn create(func: fn () noreturn) !*Task {
         var task = try mm.memoryAllocator().alloc(Task);
-        var stack = try mm.memoryAllocator().alloc([0x1000]u8);
+        var stack = try mm.memoryAllocator().alloc([arch.KERNEL_STACK_SIZE]u8);
         task.regs = arch.TaskRegs.setup(func, stack);
+        task.stack = stack;
         task.next = NextNode{ .next = null, .data = {} };
         return task;
     }

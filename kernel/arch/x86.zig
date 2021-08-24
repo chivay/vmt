@@ -201,16 +201,19 @@ const Node = kernel.logging.SinkNode;
 var vga_node = Node{ .data = format_to_vga };
 var serial_node = Node{ .data = format_to_com1 };
 
+pub const KERNEL_STACK_SIZE = 1 * 0x1000;
+
 extern var KERNEL_BASE: [*]align(0x1000) u8;
 extern var KERNEL_VIRT_BASE: *align(0x1000) u8;
-pub var stack: [2 * 0x1000]u8 align(0x10) = undefined;
+pub var stack: [KERNEL_STACK_SIZE * 2]u8 align(0x10) = undefined;
 
 pub fn boot_entry() noreturn {
     kernel.logging.register_sink(&vga_node);
     kernel.logging.register_sink(&serial_node);
 
-    kernel.task.init_task.regs.rsp = undefined;
-    kernel.task.init_task.regs.stack_bottom = @ptrToInt(&stack[0]) + stack.len;
+    kernel.task.init_task.regs.rsp = 0x2137;
+    kernel.task.init_task.regs.stack_bottom = @ptrToInt(&stack) + stack.len;
+    kernel.task.init_task.stack = &stack;
 
     // setup identity mapping
     const VIRT_START = kernel.mm.VirtualAddress.new(@ptrToInt(&KERNEL_VIRT_BASE));
