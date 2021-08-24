@@ -241,9 +241,10 @@ pub fn enable_interrupts() void {
     sti();
 }
 
-pub fn enter_userspace() !void {
+const userspace_location = 0x1337000;
+
+pub fn setup_userspace() !void {
     const frame = try kernel.mm.frameAllocator().alloc_zero_frame();
-    const userspace_location = 0x1337000;
     _ = try kernel.mm.kernel_vm.map_memory(
         kernel.mm.VirtualAddress.new(userspace_location),
         frame,
@@ -264,6 +265,9 @@ pub fn enter_userspace() !void {
         "\xeb\xfc" // jmp to syscall
     ;
     std.mem.copy(u8, @intToPtr([*]u8, userspace_location)[0..0x1000], program);
+}
+
+pub fn enter_userspace() void {
     exit_to_userspace(userspace_location, 0x0);
 }
 

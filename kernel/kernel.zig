@@ -55,20 +55,32 @@ pub fn kmain() void {
     mm.init();
     arch.init();
 
-    var taskA = Task.create(worker) catch {
+    var taskA = Task.create(usermode) catch {
         @panic("Failed to allocate a task");
     };
-    var taskB = Task.create(worker2) catch {
+    var taskB = Task.create(usermode) catch {
         @panic("Failed to allocate a task");
     };
+    var taskC = Task.create(worker2) catch {
+        @panic("Failed to allocate a task");
+    };
+
+    arch.setup_userspace() catch {};
 
     var scheduler = task.scheduler();
-    scheduler.addTask(&task.init_task);
     scheduler.addTask(taskA);
     scheduler.addTask(taskB);
+    scheduler.addTask(taskC);
 
     //arch.enable_interrupts();
-    arch.enter_userspace() catch {
-        @panic("Failed to enter userspace");
-    };
+    while (true) {
+        logger.info("Idle task yielding...\n", .{});
+        scheduler.yield();
+    }
+}
+
+pub fn usermode() noreturn {
+    logger.info("Entering userspace\n", .{});
+    arch.enter_userspace();
+    unreachable;
 }
