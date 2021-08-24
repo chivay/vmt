@@ -493,7 +493,9 @@ export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFra
             hang();
         },
         else => {
-            logger.log("Received unknown interrupt {}\n", .{interrupt_num});
+            const ex = @intToEnum(CpuException, interrupt_num);
+            logger.log("Received unknown interrupt {}\n", .{ex});
+            logger.log("{x}\n", .{frame});
             hang();
         },
     }
