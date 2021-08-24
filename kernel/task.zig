@@ -3,6 +3,8 @@ const kernel = @import("root");
 const arch = kernel.arch;
 const mm = kernel.mm;
 
+pub var logger = kernel.logging.logger("task"){};
+
 pub const Task = struct {
     regs: arch.TaskRegs,
     stack: []u8,
@@ -18,10 +20,31 @@ pub const Task = struct {
         task.next = NextNode{ .next = null, .data = {} };
         return task;
     }
+
+    pub fn format(self: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, stream: anytype) !void {
+        _ = fmt;
+        try stream.writeAll(@typeName(Self));
+        try stream.writeAll("{");
+        try std.fmt.formatType(self.regs, fmt, options, stream, 1);
+        try stream.writeAll("}");
+    }
 };
 
-pub fn switch_task(from: *Task, to: *Task) void {
-    arch.asm_switch_task(&from.regs, &to.regs);
+pub fn switch_task(to: *Task) void {
+    const core_block = kernel.getCoreBlock();
+
+    const prev_task = core_block.current_task;
+    const next_task = to;
+    std.debug.assert(prev_task != next_task);
+
+    // Ensure we'll get scheduled sometime
+    scheduler().addTask(prev_task);
+
+    // Swap tasks
+    core_block.current_task = next_task;
+    defer core_block.current_task = prev_task;
+
+    arch.switch_task(prev_task, next_task);
 }
 
 pub var init_task: Task = std.mem.zeroes(Task);
@@ -43,15 +66,9 @@ pub const Scheduler = struct {
         @panic("Nothing to schedule!");
     }
 
-    pub fn yield(self: *@This()) void {
+    pub fn yield(self: *Self) void {
         const next_task: *Task = self.reschedule();
-        const core_block = kernel.getCoreBlock();
-
-        const prev_task = core_block.current_task;
-        core_block.current_task = next_task;
-
-        self.addTask(core_block.current_task);
-        switch_task(prev_task, next_task);
+        switch_task(next_task);
     }
 };
 

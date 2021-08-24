@@ -509,6 +509,11 @@ const exception_stubs = init: {
     break :init stubs;
 };
 
+pub fn switch_task(from: *kernel.task.Task, to: *kernel.task.Task) void {
+    main_tss.rsp[0] = @ptrToInt(to.stack.ptr) + to.stack.len;
+    asm_switch_task(&from.regs, &to.regs);
+}
+
 fn syscall_entry() callconv(.Naked) void {
     comptime {
         std.debug.assert(@offsetOf(kernel.task.Task, "regs") == 0);
@@ -550,7 +555,6 @@ pub fn exit_to_userspace(rip: u64, rsp: u64) noreturn {
     const flags: u64 = 0;
     asm volatile (
         \\ swapgs
-        \\ xchgw %%bx, %%bx
         \\ sysretq
         :
         : [rip] "{rcx}" (rip),
