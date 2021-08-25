@@ -1,5 +1,3 @@
-const std = @import("std");
-
 pub const arch = @import("arch.zig");
 pub const lib = @import("lib.zig");
 pub const logging = @import("logging.zig");
@@ -10,6 +8,8 @@ pub const syscall = @import("syscall.zig");
 pub const task = @import("task.zig");
 
 pub const logger = logging.logger("kernel"){};
+
+const std = @import("std");
 
 pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace) noreturn {
     logger.critical("PANIK: {s}\n", .{msg});

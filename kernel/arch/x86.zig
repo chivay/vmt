@@ -24,7 +24,7 @@ comptime {
     _ = multiboot;
 }
 
-pub var logger = kernel.logging.logger("x86"){};
+pub const logger = @TypeOf(kernel.logger).childOf(@typeName(@This())){};
 
 const GDT = gdt.GlobalDescriptorTable(8);
 const IDT = InterruptDescriptorTable;

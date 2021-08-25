@@ -3,7 +3,7 @@ const arch = kernel.arch;
 const mm = kernel.mm;
 const task = kernel.task;
 
-pub var logger = kernel.logging.logger("main"){};
+const logger = @TypeOf(kernel.logger).childOf(@typeName(@This())){};
 
 pub fn worker() noreturn {
     while (true) {
