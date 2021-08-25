@@ -227,7 +227,7 @@ pub fn boot_entry() noreturn {
 
     logger.info("Booting the kernel...\n", .{});
     logger.info("Command line: {s}\n", .{multiboot.get_cmdline()});
-    kernel.kmain();
+    kernel.main.kmain();
 
     hang();
 }
@@ -550,7 +550,7 @@ comptime {
     );
 }
 export fn handle_syscall() callconv(.C) u64 {
-    kernel.syscall_dispatch();
+    kernel.syscall.syscall_dispatch();
     return 0;
 }
 

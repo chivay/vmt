@@ -1,13 +1,13 @@
 const std = @import("std");
-const builtin = @import("builtin");
 
-pub const logging = @import("logging.zig");
-pub const mm = @import("mm.zig");
 pub const arch = @import("arch.zig");
-pub const mmio = @import("mmio.zig");
-pub const task = @import("task.zig");
 pub const lib = @import("lib.zig");
-const Task = task.Task;
+pub const logging = @import("logging.zig");
+pub const main = @import("main.zig");
+pub const mm = @import("mm.zig");
+pub const mmio = @import("mmio.zig");
+pub const syscall = @import("syscall.zig");
+pub const task = @import("task.zig");
 
 pub const logger = logging.logger("kernel"){};
 
@@ -22,65 +22,6 @@ pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace) noreturn {
     arch.hang();
 }
 
-var sys_no: u32 = 0;
-pub fn syscall_dispatch() void {
-    logger.log("syscall entry {}\n", .{sys_no});
-    sys_no += 1;
-    task.scheduler().yield();
-}
-
 pub fn getCoreBlock() *arch.CoreBlock {
     return arch.getCoreBlock();
-}
-
-pub fn worker() noreturn {
-    while (true) {
-        logger.log("Hello from worker!\n", .{});
-        task.scheduler().yield();
-    }
-}
-
-pub fn worker2() noreturn {
-    while (true) {
-        logger.log("Hello from worker 2!\n", .{});
-        task.scheduler().yield();
-    }
-}
-
-pub fn kmain() void {
-    arch.init_cpu() catch {
-        @panic("Failed to initialize the CPU");
-    };
-
-    mm.init();
-    arch.init();
-
-    var taskA = Task.create(usermode) catch {
-        @panic("Failed to allocate a task");
-    };
-    var taskB = Task.create(usermode) catch {
-        @panic("Failed to allocate a task");
-    };
-    var taskC = Task.create(worker2) catch {
-        @panic("Failed to allocate a task");
-    };
-
-    arch.setup_userspace() catch {};
-
-    var scheduler = task.scheduler();
-    scheduler.addTask(taskA);
-    scheduler.addTask(taskB);
-    scheduler.addTask(taskC);
-
-    //arch.enable_interrupts();
-    while (true) {
-        logger.info("Idle task yielding...\n", .{});
-        scheduler.yield();
-    }
-}
-
-pub fn usermode() noreturn {
-    logger.info("Entering userspace\n", .{});
-    arch.enter_userspace();
-    unreachable;
 }
