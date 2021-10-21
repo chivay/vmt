@@ -2,7 +2,7 @@ const std = @import("std");
 const kernel = @import("root");
 const mm = kernel.mm;
 const lib = kernel.lib;
-const x86 = @import("../x86.zig");
+const x86 = kernel.arch.x86;
 
 const BIT = kernel.lib.BIT;
 const bit_set = kernel.lib.bit_set;
@@ -11,30 +11,6 @@ const PhysicalAddress = mm.PhysicalAddress;
 const VirtualAddress = mm.VirtualAddress;
 
 const mask: u64 = ~@as(u64, 0xfff);
-
-pub inline fn get_pml4_slot(addr: VirtualAddress) PML4.IdxType {
-    const pml4_index_ = (addr.value >> 39) & 0x1ff;
-    std.debug.assert(pml4_index_ <= PML4.MaxIndex);
-    return @intCast(PML4.IdxType, pml4_index_);
-}
-
-pub inline fn get_pdpt_slot(addr: VirtualAddress) PDPT.IdxType {
-    const pdpt_index = (addr.value >> 30) & 0x1ff;
-    std.debug.assert(pdpt_index <= PDPT.MaxIndex);
-    return @intCast(PDPT.IdxType, pdpt_index);
-}
-
-pub inline fn get_pd_slot(addr: VirtualAddress) PD.IdxType {
-    const pd_index = (addr.value >> 21) & 0x1ff;
-    std.debug.assert(pd_index <= PD.MaxIndex);
-    return @intCast(PD.IdxType, pd_index);
-}
-
-pub inline fn get_pt_slot(addr: VirtualAddress) PT.IdxType {
-    const pt_index = (addr.value >> 12) & 0x1ff;
-    std.debug.assert(pt_index <= PT.MaxIndex);
-    return @intCast(PT.IdxType, pt_index);
-}
 
 pub fn flushTlb() void {
     x86.CR3.write(x86.CR3.read());
@@ -119,6 +95,12 @@ pub const PT = struct {
                 break;
             }
         }
+    }
+
+    pub inline fn get_slot(addr: VirtualAddress) IdxType {
+        const pt_index = (addr.value >> 12) & 0x1ff;
+        std.debug.assert(pt_index <= PT.MaxIndex);
+        return @intCast(PT.IdxType, pt_index);
     }
 };
 
@@ -250,6 +232,12 @@ pub const PD = struct {
             }
         }
     }
+
+    pub fn get_slot(addr: VirtualAddress) IdxType {
+        const pd_index = (addr.value >> 21) & 0x1ff;
+        std.debug.assert(pd_index <= PD.MaxIndex);
+        return @intCast(PD.IdxType, pd_index);
+    }
 };
 
 pub const PDPT = struct {
@@ -341,6 +329,12 @@ pub const PDPT = struct {
                 break;
             }
         }
+    }
+
+    pub fn get_slot(addr: VirtualAddress) IdxType {
+        const pdpt_index = (addr.value >> 30) & 0x1ff;
+        std.debug.assert(pdpt_index <= PDPT.MaxIndex);
+        return @intCast(PDPT.IdxType, pdpt_index);
     }
 };
 
@@ -444,5 +438,11 @@ pub const PML4 = struct {
             }
         }
         context.done();
+    }
+
+    pub fn get_slot(addr: VirtualAddress) IdxType {
+        const pml4_index_ = (addr.value >> 39) & 0x1ff;
+        std.debug.assert(pml4_index_ <= PML4.MaxIndex);
+        return @intCast(PML4.IdxType, pml4_index_);
     }
 };

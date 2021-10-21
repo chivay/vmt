@@ -1,7 +1,7 @@
 const std = @import("std");
 const kernel = @import("root");
 const mm = kernel.mm;
-const x86 = @import("../x86.zig");
+const x86 = kernel.arch.x86;
 const lib = kernel.lib;
 
 const PhysicalAddress = mm.PhysicalAddress;
@@ -10,13 +10,10 @@ const VirtualAddress = mm.VirtualAddress;
 const paging = @import("paging.zig");
 
 const PML4 = paging.PML4;
+const PDPT = paging.PDPT;
 const PD = paging.PD;
 const PT = paging.PT;
 const PageKind = paging.PageKind;
-const get_pml4_slot = paging.get_pml4_slot;
-const get_pdpt_slot = paging.get_pdpt_slot;
-const get_pd_slot = paging.get_pd_slot;
-const get_pt_slot = paging.get_pt_slot;
 
 pub const VirtAddrType = u64;
 pub const PhysAddrType = u64;
@@ -121,10 +118,10 @@ pub const VirtualMemoryImpl = struct {
             return Error.UnalignedAddress;
         }
 
-        const pml4_index = get_pml4_slot(where);
-        const pdpt_index = get_pdpt_slot(where);
-        const pd_index = get_pd_slot(where);
-        const pt_index = get_pt_slot(where);
+        const pml4_index = PML4.get_slot(where);
+        const pdpt_index = PDPT.get_slot(where);
+        const pd_index = PD.get_slot(where);
+        const pt_index = PT.get_slot(where);
 
         const pdpt = try self.pml4.get_pdpt_alloc(self.allocator, pml4_index);
         const pd = try pdpt.get_pd_alloc(self.allocator, pdpt_index);
@@ -157,10 +154,10 @@ pub const VirtualMemoryImpl = struct {
             return Error.UnalignedAddress;
         }
 
-        const pml4_index = get_pml4_slot(where);
-        const pdpt_index = get_pdpt_slot(where);
-        const pd_index = get_pd_slot(where);
-        const pt_index = get_pt_slot(where);
+        const pml4_index = PML4.get_slot(where);
+        const pdpt_index = PDPT.get_slot(where);
+        const pd_index = PD.get_slot(where);
+        const pt_index = PT.get_slot(where);
 
         const pdpt = self.pml4.get_pdpt(pml4_index) orelse return Error.MappingNotExists;
         const pd = pdpt.get_pd(pdpt_index) orelse return Error.MappingNotExists;
@@ -183,9 +180,9 @@ pub const VirtualMemoryImpl = struct {
             return Error.UnalignedAddress;
         }
 
-        const pml4_index = get_pml4_slot(where);
-        const pdpt_index = get_pdpt_slot(where);
-        const pd_index = get_pd_slot(where);
+        const pml4_index = PML4.get_slot(where);
+        const pdpt_index = PDPT.get_slot(where);
+        const pd_index = PD.get_slot(where);
 
         const pdpt = try self.pml4.get_pdpt_alloc(self.allocator, pml4_index);
         const pd = try pdpt.get_pd_alloc(self.allocator, pdpt_index);
@@ -221,9 +218,9 @@ pub const VirtualMemoryImpl = struct {
             return Error.UnalignedAddress;
         }
 
-        const pml4_index = get_pml4_slot(where);
-        const pdpt_index = get_pdpt_slot(where);
-        const pd_index = get_pd_slot(where);
+        const pml4_index = PML4.get_slot(where);
+        const pdpt_index = PDPT.get_slot(where);
+        const pd_index = PD.get_slot(where);
 
         const pdpt = self.pml4.get_pdpt(pml4_index) orelse return Error.MappingNotExists;
         const pd = pdpt.get_pd(pdpt_index) orelse return Error.MappingNotExists;
@@ -328,10 +325,10 @@ pub const VirtualMemoryImpl = struct {
     }
 
     fn get_page_kind(self: *const Self, where: VirtualAddress) ?PageKind {
-        const pml4_index = get_pml4_slot(where);
-        const pdpt_index = get_pdpt_slot(where);
-        const pd_index = get_pd_slot(where);
-        const pt_index = get_pt_slot(where);
+        const pml4_index = PML4.get_slot(where);
+        const pdpt_index = PDPT.get_slot(where);
+        const pd_index = PD.get_slot(where);
+        const pt_index = PT.get_slot(where);
 
         const pdpt = self.pml4.get_pdpt(pml4_index) orelse return null;
         switch (pdpt.get_entry_kind(pdpt_index)) {
