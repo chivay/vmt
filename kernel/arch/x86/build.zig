@@ -4,8 +4,6 @@ const Arch = std.Target.Cpu.Arch;
 const CrossTarget = std.zig.CrossTarget;
 const CpuFeature = std.Target.Cpu.Feature;
 
-pub usingnamespace CpuFeature.feature_set_fns(std.Target.x86.Feature);
-
 pub fn build(kernel: *std.build.LibExeObjStep) void {
     const builder = kernel.builder;
     var kernel_tls = builder.step("kernel", "Build kernel ELF");
@@ -13,7 +11,7 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
     const cross_target = CrossTarget{
         .cpu_arch = Arch.x86_64,
         .cpu_model = CrossTarget.CpuModel.baseline,
-        .cpu_features_sub = featureSet(&[_]std.Target.x86.Feature{
+        .cpu_features_sub = std.Target.x86.featureSet(&[_]std.Target.x86.Feature{
             .cmov,
             .cx8,
             .fxsr,
