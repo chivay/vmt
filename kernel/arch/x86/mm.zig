@@ -7,7 +7,16 @@ const lib = kernel.lib;
 const PhysicalAddress = mm.PhysicalAddress;
 const VirtualAddress = mm.VirtualAddress;
 
-usingnamespace @import("paging.zig");
+const paging = @import("paging.zig");
+
+const PML4 = paging.PML4;
+const PD = paging.PD;
+const PT = paging.PT;
+const PageKind = paging.PageKind;
+const get_pml4_slot = paging.get_pml4_slot;
+const get_pdpt_slot = paging.get_pdpt_slot;
+const get_pd_slot = paging.get_pd_slot;
+const get_pt_slot = paging.get_pt_slot;
 
 pub const VirtAddrType = u64;
 pub const PhysAddrType = u64;
@@ -380,7 +389,7 @@ pub const VirtualMemoryImpl = struct {
                 .Page1G => @panic("Unimplemented"),
             }
         }
-        flushTlb();
+        paging.flushTlb();
     }
 };
 
