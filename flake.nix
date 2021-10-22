@@ -23,6 +23,11 @@
             zig build kernel
             '';
 
+            doCheck = true;
+            checkPhase = ''
+            zig test kernel/kernel.zig
+            '';
+
             installPhase = ''
             cp -r ./build/x86_64/kernel $out
             '';

@@ -25,3 +25,7 @@ pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace) noreturn {
 pub fn getCoreBlock() *arch.CoreBlock {
     return arch.getCoreBlock();
 }
+
+test {
+    _ = mm;
+}
