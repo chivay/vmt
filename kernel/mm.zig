@@ -72,11 +72,11 @@ fn AddrWrapper(comptime name: []const u8, comptime T: type) type {
         }
 
         pub fn add(self: Self, val: Type) Self {
-            return .{ .value = val + self.value };
+            return .{ .value = self.value + val };
         }
 
         pub fn sub(self: Self, val: Type) Self {
-            return .{ .value = val + self.value };
+            return .{ .value = self.value - val };
         }
 
         pub fn le(self: Self, other: Self) bool {
