@@ -3,7 +3,7 @@
   nixConfig.bash-prompt = "\[vmt-develop\]$ ";
 
   inputs.flake-utils.url = "github:numtide/flake-utils";
-  inputs.nixpkgs.url = "github:nixos/nixpkgs";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
   inputs.zig-nightly.url = "github:chivay/zig-nightly";
 
   outputs = { self, nixpkgs, flake-utils, zig-nightly }:
