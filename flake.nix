@@ -33,7 +33,7 @@
             '';
 
           };
-          devShell = pkgs.mkShell { buildInputs = [ zig ]; };
+          devShell = pkgs.mkShell { buildInputs = [ zig pkgs.qemu pkgs.grub2 pkgs.xorriso ]; };
         }
       );
 }
