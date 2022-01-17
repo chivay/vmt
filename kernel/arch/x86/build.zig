@@ -52,7 +52,7 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
     const memory = builder.option([]const u8, "vm-memory", "VM memory e.g. 1G, 128M") orelse "1G";
     const cpus = builder.option([]const u8, "vm-cpus", "number of vCPUs") orelse "1";
     const display = builder.option([]const u8, "qemu-display", "type of QEMU display") orelse "none";
-    const use_uefi = builder.option(bool, "vm-uefi", "use UEFI") orelse true;
+    const use_uefi = builder.option(bool, "vm-uefi", "use UEFI") orelse false;
 
     var qemu_tls = builder.step("qemu", "Run QEMU");
     var qemu = builder.addSystemCommand(&[_][]const u8{"qemu-system-x86_64"});
