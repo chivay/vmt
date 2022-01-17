@@ -13,7 +13,7 @@ fn buildArch(kernel: *std.build.LibExeObjStep, arch: std.Target.Cpu.Arch) void {
             @import("kernel/arch/arm64/build.zig").build(kernel);
         },
         else => {
-            std.debug.warn("Invalid architecture", .{});
+            std.debug.print("Invalid architecture", .{});
         },
     }
 }
