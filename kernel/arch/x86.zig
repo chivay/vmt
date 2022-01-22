@@ -469,6 +469,10 @@ pub fn enable_interrupts() void {
     sti();
 }
 
+pub fn disable_interrupts() void {
+    cli();
+}
+
 const userspace_location = 0x1337000;
 
 pub fn setup_userspace() !void {
