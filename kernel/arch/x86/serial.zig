@@ -15,8 +15,13 @@ pub fn SerialPort(comptime id: u8) type {
 
         const SerialError = error{SerialError};
         pub const Writer = io.Writer(Self, SerialError, write);
+        pub const Reader = io.Reader(Self, SerialError, read);
 
         pub fn writer() Writer {
+            return .{ .context = Self{} };
+        }
+
+        pub fn reader() Reader {
             return .{ .context = Self{} };
         }
 
@@ -38,6 +43,21 @@ pub fn SerialPort(comptime id: u8) type {
         pub inline fn write_char(_: Self, c: u8) void {
             while (x86.in(u8, PORT_BASE + 5) & 0x20 == 0) {}
             x86.out(u8, PORT_BASE, c);
+        }
+
+        pub fn data_available(_: Self) bool {
+            return (x86.in(u8, PORT_BASE + 5) & 0x1) != 0;
+        }
+
+        pub fn read_char(self: Self) u8 {
+            while (!self.data_available()) {}
+            return x86.in(u8, PORT_BASE + 0);
+        }
+
+        pub fn read(self: Self, buffer: []u8) SerialError!usize {
+            if (buffer.len == 0) return 0;
+            buffer[0] = self.read_char();
+            return 1;
         }
 
         pub fn write(self: Self, data: []const u8) SerialError!usize {
