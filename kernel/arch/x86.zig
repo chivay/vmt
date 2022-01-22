@@ -201,6 +201,18 @@ pub inline fn set_ss(selector: u16) void {
     );
 }
 
+pub inline fn rdtsc() u64 {
+    return asm volatile (
+        \\ rdtsc
+        \\ # results are in EDX:EAX
+        \\ shl $32, %%rdx
+        \\ or %%rdx, %%rax
+        : [ret] "={rax}" (-> u64),
+        :
+        : "rdx"
+    );
+}
+
 pub inline fn rdmsr(which: u32) u64 {
     return asm volatile (
         \\ rdmsr
