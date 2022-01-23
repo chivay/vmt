@@ -147,6 +147,10 @@ pub inline fn in(comptime T: type, address: u16) T {
     };
 }
 
+pub inline fn bochs_breakpoint() void {
+    asm volatile ("xchgw %%bx, %%bx");
+}
+
 pub inline fn hlt() void {
     asm volatile ("hlt");
 }
