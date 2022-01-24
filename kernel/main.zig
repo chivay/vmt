@@ -46,11 +46,10 @@ pub fn kmain() void {
     scheduler.addTask(taskB);
     scheduler.addTask(taskC);
 
-    //arch.enable_interrupts();
-    while (true) {
-        logger.info("Idle task yielding...\n", .{});
-        scheduler.yield();
-    }
+    logger.info("Enabling interrupts\n", .{});
+
+    arch.enable_interrupts();
+    arch.idle();
 }
 
 pub fn usermode() noreturn {

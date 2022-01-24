@@ -17,6 +17,8 @@ pub const trampoline = @import("x86/trampoline.zig");
 pub const smp = @import("x86/smp.zig");
 pub const gdt = @import("x86/gdt.zig");
 pub const framebuffer = @import("x86/framebuffer.zig");
+pub const pit = @import("x86/pit.zig");
+pub const timer = @import("x86/timer.zig");
 
 comptime {
     // Force multiboot evaluation to make multiboot_entry present
@@ -411,6 +413,7 @@ pub fn MSR(n: u32) type {
     };
 }
 
+pub const IA32_TSC_DEADLINE = MSR(0x6E0);
 pub const APIC_BASE = MSR(0x0000_001B);
 pub const EFER = MSR(0xC000_0080);
 pub const IA32_STAR = MSR(0xC000_0081);
@@ -929,6 +932,51 @@ fn keyboard_echo() void {
     pic.Master.send_eoi();
 }
 
+pub const IrqRegistration = struct {
+    func: fn () void,
+    next: ?*IrqRegistration,
+
+    pub fn new(func: fn () void) @This() {
+        return .{ .func = func, .next = null };
+    }
+};
+
+var handlers = [_]?*IrqRegistration{null} ** 256;
+
+pub fn register_irq_handler(irq: u8, reg: *IrqRegistration) !void {
+    if (handlers[irq]) |registration| {
+        reg.next = registration;
+        handlers[irq] = reg;
+    }
+    handlers[irq] = reg;
+}
+
+pub fn unregister_irq_handler(irq: u8, reg: *IrqRegistration) !void {
+    var current = handlers[irq];
+    if (current) |registration| {
+        if (registration == reg) {
+            handlers[irq] = reg.next;
+            reg.next = null;
+            return;
+        }
+    }
+
+    while (current) |registation| {
+        if (registation.next) |next_registration| {
+            if (next_registration == reg) {
+                registation.next = reg.next;
+                reg.next = null;
+                return;
+            }
+        }
+    }
+    @panic("Tried to unregister invalid registration");
+}
+
+fn handle_page_fault(addr: u64) void {
+    logger.info("#PF at {x}\n", .{addr});
+}
+
 export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFrame) callconv(.C) void {
     _ = error_code;
     switch (interrupt_num) {
@@ -938,22 +986,28 @@ export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFra
             logger.log("{x}\n", .{frame});
             logger.log("======================\n", .{});
         },
-        0x31 => {
-            logger.log("{x}\n", .{frame});
-            keyboard_echo();
-        },
         @enumToInt(CpuException.GeneralProtectionFault) => {
             @panic("General Protection Fault");
         },
         @enumToInt(CpuException.PageFault) => {
-            logger.log("#PF at {x}!\n", .{CR2.read()});
-            hang();
+            logger.log("{}\n", .{frame});
+            handle_page_fault(CR2.read());
+        },
+        0x20...0xff => {
+            var handler = handlers[interrupt_num];
+            if (handler == null) {
+                logger.err("Received interrupt {}\n", .{interrupt_num});
+                @panic("Unknown interrupt");
+            }
+            while (handler) |registration| {
+                registration.func();
+                handler = registration.next;
+            }
         },
         else => {
-            const ex = @intToEnum(CpuException, interrupt_num);
-            logger.log("Received unknown interrupt {}\n", .{ex});
-            logger.log("{x}\n", .{frame});
-            hang();
+            logger.err("Got exception: {}\n", .{interrupt_num});
+            logger.err("{}\n", .{frame});
+            @panic("Unhandled exception");
         },
     }
 }
@@ -1048,6 +1102,18 @@ pub var user_base: gdt.SegmentSelector = undefined;
 pub var user_code: gdt.SegmentSelector = undefined;
 pub var user_data: gdt.SegmentSelector = undefined;
 
+// Used by PIT
+pub const IRQ_0 = 0x20;
+// Used by APIC timer
+pub const IRQ_1 = 0x21;
+pub const IRQ_2 = 0x22;
+pub const IRQ_3 = 0x23;
+pub const IRQ_4 = 0x24;
+pub const IRQ_5 = 0x25;
+pub const IRQ_6 = 0x26;
+pub const IRQ_7 = 0x27;
+pub const IRQ_8 = 0x28;
+
 pub fn init_cpu() !void {
     cpu_phys_bits = get_maxphyaddr();
     const Entry = GDT.Entry;
@@ -1093,18 +1159,16 @@ pub fn init_cpu() !void {
     GSBASE.write(@ptrToInt(&boot_cpu_gsstruct));
 
     setup_syscall();
-
-    //pic.remap(0x30, 0x38);
-    //// enable only keyboard interrupt
-    //pic.Master.data_write(0xfd);
-    //pic.Slave.data_write(0xff);
 }
 
 pub fn init() void {
+    pic.init();
     framebuffer.init();
+    pit.init();
     trampoline.init();
     acpi.init();
     apic.init();
+    timer.init();
     pci.init();
     smp.init();
 }

@@ -25,6 +25,10 @@ fn PIC(port_base: u32) type {
         pub fn send_eoi() void {
             Self.command(PIC_EOI);
         }
+
+        pub fn disable() void {
+            Self.set_mask(0xff);
+        }
     };
 }
 
@@ -35,6 +39,11 @@ const ICW1_INIT = 0x10;
 
 pub const Master = PIC(0x20);
 pub const Slave = PIC(0xa0);
+
+pub fn disable() void {
+    Master.disable();
+    Slave.disable();
+}
 
 pub fn remap(offset1: u8, offset2: u8) void {
     const master_mask = Master.data_read();
@@ -54,4 +63,10 @@ pub fn remap(offset1: u8, offset2: u8) void {
 
     Master.data_write(master_mask);
     Slave.data_write(slave_mask);
+}
+
+pub fn init() void {
+    remap(x86.IRQ_0, x86.IRQ_8);
+    Master.data_write(0x00);
+    Slave.data_write(0x00);
 }
