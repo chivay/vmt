@@ -1,3 +1,4 @@
+const std = @import("std");
 const builtin = @import("builtin");
 
 pub const SpinLock = struct {
@@ -32,6 +33,7 @@ pub const SpinLock = struct {
             if (self.tryAcquire()) |held| {
                 return held;
             }
+            std.atomic.spinLoopHint();
         }
     }
 };
