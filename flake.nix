@@ -31,7 +31,7 @@
             '';
 
           };
-          devShell = pkgs.mkShell { buildInputs = [ pkgs.zig pkgs.qemu pkgs.grub2 pkgs.xorriso ]; };
+          devShell = pkgs.mkShell { buildInputs = with pkgs; [ zig qemu grub2 xorriso ]; };
         }
       );
 }
