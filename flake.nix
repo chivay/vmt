@@ -8,8 +8,8 @@
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem
       (system:
-      let pkgs = nixpkgs.legacyPackages.${system};
-      in
+        let pkgs = nixpkgs.legacyPackages.${system};
+        in
         {
           packages.vmt = pkgs.stdenv.mkDerivation {
             name = "vmt";
@@ -17,21 +17,21 @@
             src = self;
 
             buildPhase = ''
-            export HOME=$TMPDIR;
-            zig build kernel
+              export HOME=$TMPDIR;
+              zig build kernel
             '';
 
             doCheck = true;
             checkPhase = ''
-            zig test kernel/kernel.zig
+              zig test kernel/kernel.zig
             '';
 
             installPhase = ''
-            cp -r ./build/x86_64/kernel $out
+              cp -r ./build/x86_64/kernel $out
             '';
 
           };
-          devShell = pkgs.mkShell { buildInputs = with pkgs; [ zig qemu grub2 xorriso ]; };
+          devShell = pkgs.mkShell { buildInputs = with pkgs; [ zig qemu grub2 xorriso bochs nixpkgs-fmt ]; };
         }
       );
 }
