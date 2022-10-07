@@ -4,8 +4,9 @@
 
   inputs.flake-utils.url = "github:numtide/flake-utils";
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+  inputs.zig-nightly.url = "github:chivay/zig-nightly";
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, zig-nightly}:
     flake-utils.lib.eachDefaultSystem
       (system:
         let pkgs = nixpkgs.legacyPackages.${system};
@@ -31,7 +32,7 @@
             '';
 
           };
-          devShell = pkgs.mkShell { buildInputs = with pkgs; [ zig qemu grub2 xorriso bochs nixpkgs-fmt ]; };
+          devShell = pkgs.mkShell { buildInputs = with pkgs; [ zig-nightly.packages.${system}.zig-nightly-bin qemu grub2 xorriso bochs nixpkgs-fmt llvmPackages_14.llvm ]; };
         }
       );
 }
