@@ -45,8 +45,11 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
 
     var iso_tls = builder.step("iso", "Build multiboot ISO");
 
+    const cmdline = builder.option([]const u8, "cmdline", "kernel command line") orelse "";
+
     var iso = builder.addSystemCommand(&[_][]const u8{"scripts/mkiso.sh"});
     iso.addArtifactArg(kernel);
+    iso.setEnvironmentVariable("CMDLINE", cmdline);
     iso_tls.dependOn(&iso.step);
 
     const memory = builder.option([]const u8, "vm-memory", "VM memory e.g. 1G, 128M") orelse "1G";
