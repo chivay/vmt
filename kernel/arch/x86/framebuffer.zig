@@ -27,7 +27,7 @@ pub fn init() void {
     });
 
     const length = fb.pitch * fb.height;
-    const buffer = kernel.mm.kernel_vm.map_io(fb_addr, length) catch unreachable;
+    const buffer = kernel.mm.getKernelVM().map_io(fb_addr, length) catch unreachable;
     framebuffer = buffer.as_bytes();
     std.mem.set(u8, framebuffer.?, 0x41);
 }

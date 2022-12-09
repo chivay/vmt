@@ -208,7 +208,7 @@ pub fn init() void {
     const start_page: u8 = @truncate(u8, (phys_start.value / PAGE_SIZE));
 
     const virt_start = mm.VirtualAddress.new(TRAMPOLINE_BASE);
-    const trampoline = mm.kernel_vm.map_memory(
+    const trampoline = mm.getKernelVM().map_memory(
         virt_start,
         phys_start,
         PAGE_SIZE,
@@ -217,7 +217,7 @@ pub fn init() void {
         logger.err("Failed to map AP memory");
         return;
     };
-    defer mm.kernel_vm.unmap(trampoline) catch {
+    defer mm.getKernelVM().unmap(trampoline) catch {
         @panic("Failed to unmap AP memory");
     };
 

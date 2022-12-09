@@ -17,6 +17,10 @@ pub fn frameAllocator() *FrameAllocator {
     return arch.mm.frameAllocator();
 }
 
+pub fn getKernelVM() *VirtualMemory {
+    return &kernel_vm;
+}
+
 const Dumper = struct {
     const Self = @This();
     const Mapping = struct {
@@ -174,7 +178,8 @@ pub const DirectMapping = struct {
     }
 };
 
-pub var kernel_vm: VirtualMemory = undefined;
+var kernel_vm: VirtualMemory = undefined;
+
 pub const VirtualMemory = struct {
     vm_impl: *arch.mm.VirtualMemoryImpl,
     const Self = @This();

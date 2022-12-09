@@ -93,7 +93,7 @@ pub fn init() void {
     const apic_id = getLapicId();
     logger.log("LAPIC ID {x}\n", .{apic_id});
 
-    const io_region = mm.kernel_vm.map_io(apic_base, 0x1000) catch |err| {
+    const io_region = mm.getKernelVM().map_io(apic_base, 0x1000) catch |err| {
         logger.err("{}", .{err});
         @panic("Failed to map IO memory for APIC");
     };

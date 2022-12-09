@@ -451,12 +451,12 @@ pub fn map_kernel_regions(vm: *mm.VirtualMemory) !void {
 
 fn setup_kernel_vm() !void {
     // Initialize generic kernel VM
-    mm.kernel_vm = mm.VirtualMemory.init(&kernel_vm_impl);
+    mm.getKernelVM().* = mm.VirtualMemory.init(&kernel_vm_impl);
 
     // Initial 1GiB mapping
     logger.debug("Identity mapping 1GiB from 0 phys\n", .{});
     const initial_mapping_size = lib.GiB(1);
-    _ = try mm.kernel_vm.map_memory(
+    _ = try mm.getKernelVM().map_memory(
         DIRECT_MAPPING.base,
         PhysicalAddress.new(0x0),
         initial_mapping_size,
@@ -465,20 +465,20 @@ fn setup_kernel_vm() !void {
 
     // Map kernel image
     logger.debug("Mapping kernel image\n", .{});
-    try map_kernel_image(&mm.kernel_vm);
+    try map_kernel_image(mm.getKernelVM());
 
     logger.debug("Switching to new virtual memory\n", .{});
-    mm.kernel_vm.switch_to();
+    mm.getKernelVM().switch_to();
     logger.debug("Survived switching to kernel VM\n", .{});
 
     // switch to new virtual memory
     directMapping().virt_start = DIRECT_MAPPING.base;
     directMapping().size = initial_mapping_size;
 
-    kernel.mm.dump_vm_mappings(&mm.kernel_vm);
+    kernel.mm.dump_vm_mappings(mm.getKernelVM());
 
     logger.debug("Mapping rest of direct memory\n", .{});
-    _ = try mm.kernel_vm.map_memory(
+    _ = try mm.getKernelVM().map_memory(
         DIRECT_MAPPING.base.add(initial_mapping_size),
         PhysicalAddress.new(0 + initial_mapping_size),
         lib.GiB(63),
