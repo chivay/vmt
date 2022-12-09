@@ -357,7 +357,7 @@ pub const VirtualMemoryImpl = struct {
         defer logger.setLevel(.Info);
 
         var left = range;
-        while (left.size > lib.KiB(4)) {
+        while (left.size >= lib.KiB(4)) {
             const kind = self.get_page_kind(left.base) orelse {
                 logger.err("Tried to unmap page at {}, but there's none\n", left.base);
                 return Error.MappingNotExists;
@@ -372,6 +372,7 @@ pub const VirtualMemoryImpl = struct {
                         return err;
                     };
                     left.base = left.base.add(lib.KiB(4));
+                    left.size -= lib.KiB(4);
                 },
                 .Page2M => {
                     if (!left.base.isAligned(lib.MiB(2))) {
@@ -382,6 +383,7 @@ pub const VirtualMemoryImpl = struct {
                         return err;
                     };
                     left.base = left.base.add(lib.MiB(2));
+                    left.size -= lib.MiB(2);
                 },
                 .Page1G => @panic("Unimplemented"),
             }
