@@ -205,6 +205,25 @@ pub const VirtualMemory = struct {
         };
     };
 
+    pub fn alloc_new() !*VirtualMemory {
+        var vm = try memoryAllocator().alloc(VirtualMemory);
+        var arch_vm = try memoryAllocator().alloc(arch.mm.VirtualMemoryImpl);
+        arch_vm.* = try arch.mm.VirtualMemoryImpl.init(frameAllocator());
+        vm.* = VirtualMemory.init(arch_vm);
+        return vm;
+    }
+
+    pub fn clone(source: *VirtualMemory) !*VirtualMemory {
+        var vm = try memoryAllocator().alloc(VirtualMemory);
+        var arch_vm = try arch.mm.VirtualMemoryImpl.clone(source.vm_impl);
+        vm.* = VirtualMemory.init(arch_vm);
+        return vm;
+    }
+
+    pub fn destroy(self: *@This()) void {
+        _ = self;
+    }
+
     pub fn init(vm_impl: *arch.mm.VirtualMemoryImpl) VirtualMemory {
         return .{ .vm_impl = vm_impl };
     }

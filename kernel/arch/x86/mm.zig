@@ -100,6 +100,33 @@ pub const VirtualMemoryImpl = struct {
         };
     }
 
+    pub fn clone(source: *VirtualMemoryImpl) !*VirtualMemoryImpl {
+        var arch_vm = try kernel.mm.memoryAllocator().alloc(VirtualMemoryImpl);
+        arch_vm.allocator = source.allocator;
+
+        const frame = try arch_vm.allocator.alloc_zero_frame();
+        arch_vm.pml4 = PML4.init(frame, null);
+        arch_vm.dynamic_next = source.dynamic_next;
+        arch_vm.dynamic_end = source.dynamic_end;
+
+        var ctx = struct {
+            arch_vm: *VirtualMemoryImpl,
+            pub fn walk(self: *@This(), virt: VirtualAddress, phys: PhysicalAddress, page_size: usize) void {
+                // TODO: fix those mappings
+                switch (page_size) {
+                        0x1000 => self.arch_vm.map_page_4kb(virt, phys, &MapOptions{.writable=true, .write_through = false,.cache_disable = false, .no_execute=false, .user=false }) catch unreachable,
+                        0x200000 => self.arch_vm.map_page_2mb(virt, phys, &MapOptions{.writable=true, .write_through = false,.cache_disable = false, .no_execute=false, .user=false }) catch unreachable,
+                        else => @panic("wtf"),
+                }
+            }
+
+            pub fn done(self: *@This()) void { _ = self; }
+        }{ .arch_vm = arch_vm };
+        source.walk(@TypeOf(ctx), &ctx);
+
+        return arch_vm;
+    }
+
     pub fn switch_to(self: Self) void {
         x86.CR3.write(self.pml4.root.value);
     }
@@ -394,6 +421,34 @@ pub const VirtualMemoryImpl = struct {
 
 pub var kernel_vm_impl: VirtualMemoryImpl = undefined;
 
+fn map_kernel_image(vm: *mm.VirtualMemory) !void {
+    const kern_end = VirtualAddress.new(@ptrToInt(&kernel_end));
+    const kernel_size = VirtualAddress.span(KERNEL_IMAGE.base, kern_end);
+    _ = vm.map_memory(
+        KERNEL_IMAGE.base,
+        PhysicalAddress.new(0),
+        std.mem.alignForward(kernel_size, lib.MiB(2)),
+        mm.VirtualMemory.Protection.RWX,
+    ) catch |err| {
+        logger.log("{}\n", .{err});
+        @panic("Failed to remap kernel");
+    };
+}
+
+fn map_direct_memory(vm: *mm.VirtualMemory) !void {
+    _ = try vm.map_memory(
+        DIRECT_MAPPING.base,
+        PhysicalAddress.new(0),
+        lib.GiB(64),
+        mm.VirtualMemory.Protection.RWX,
+    );
+}
+
+pub fn map_kernel_regions(vm: *mm.VirtualMemory) !void {
+    try map_kernel_image(vm);
+    try map_direct_memory(vm);
+}
+
 fn setup_kernel_vm() !void {
     // Initialize generic kernel VM
     mm.kernel_vm = mm.VirtualMemory.init(&kernel_vm_impl);
@@ -410,17 +465,7 @@ fn setup_kernel_vm() !void {
 
     // Map kernel image
     logger.debug("Mapping kernel image\n", .{});
-    const kern_end = VirtualAddress.new(@ptrToInt(&kernel_end));
-    const kernel_size = VirtualAddress.span(KERNEL_IMAGE.base, kern_end);
-    _ = mm.kernel_vm.map_memory(
-        KERNEL_IMAGE.base,
-        PhysicalAddress.new(0),
-        std.mem.alignForward(kernel_size, lib.MiB(2)),
-        mm.VirtualMemory.Protection.RWX,
-    ) catch |err| {
-        logger.log("{}\n", .{err});
-        @panic("Failed to remap kernel");
-    };
+    try map_kernel_image(&mm.kernel_vm);
 
     logger.debug("Switching to new virtual memory\n", .{});
     mm.kernel_vm.switch_to();

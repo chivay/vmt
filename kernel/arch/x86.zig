@@ -484,7 +484,7 @@ const userspace_location = 0x1337000;
 
 pub fn setup_userspace() !void {
     const frame = try kernel.mm.frameAllocator().alloc_zero_frame();
-    _ = try kernel.mm.kernel_vm.map_memory(
+    _ = try kernel.getCoreBlock().current_task.vm.map_memory(
         kernel.mm.VirtualAddress.new(userspace_location),
         frame,
         0x1000,
@@ -1159,6 +1159,7 @@ pub fn init_cpu() !void {
     GSBASE.write(@ptrToInt(&boot_cpu_gsstruct));
 
     setup_syscall();
+
 }
 
 pub fn init() void {

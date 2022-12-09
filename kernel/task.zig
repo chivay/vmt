@@ -7,6 +7,7 @@ pub var logger = kernel.logging.logger("task"){};
 
 pub const Task = struct {
     regs: arch.TaskRegs,
+    vm: *mm.VirtualMemory,
     stack: []u8,
     next: NextNode,
 
@@ -18,6 +19,7 @@ pub const Task = struct {
         task.regs = arch.TaskRegs.setup(func, stack);
         task.stack = stack;
         task.next = NextNode{ .next = null, .data = {} };
+        task.vm = try mm.getKernelVM().clone();
         return task;
     }
 
@@ -43,11 +45,17 @@ pub fn switch_task(to: *Task) void {
     // Swap tasks
     core_block.current_task = next_task;
     defer core_block.current_task = prev_task;
+    core_block.current_task.vm.switch_to();
 
     arch.switch_task(prev_task, next_task);
 }
 
-pub var init_task: Task = std.mem.zeroes(Task);
+pub var init_task = Task{
+    .vm = mm.getKernelVM(),
+    .regs = std.mem.zeroes(kernel.arch.TaskRegs),
+    .stack = &[_]u8{},
+    .next = .{.data = .{}},
+};
 
 pub const Scheduler = struct {
     task_list: std.TailQueue(void),

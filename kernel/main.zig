@@ -19,6 +19,7 @@ pub fn worker2() noreturn {
     }
 }
 
+
 pub fn kmain() void {
     arch.init_cpu() catch {
         @panic("Failed to initialize the CPU");
@@ -39,7 +40,6 @@ pub fn kmain() void {
         @panic("Failed to allocate a task");
     };
 
-    arch.setup_userspace() catch {};
 
     var scheduler = task.scheduler();
     scheduler.addTask(taskA);
@@ -53,6 +53,7 @@ pub fn kmain() void {
 }
 
 pub fn usermode() noreturn {
+    arch.setup_userspace() catch {};
     logger.info("Entering userspace\n", .{});
     arch.enter_userspace();
     unreachable;

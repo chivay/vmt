@@ -29,6 +29,8 @@ fn irq_handler() void {
     logger.debug("Tick\n", .{});
     const eoi = apic.lapic.Reg(u32, 0xb0);
     eoi.write(0);
+
+    kernel.task.scheduler().yield();
 }
 
 var reg = x86.IrqRegistration.new(irq_handler);
