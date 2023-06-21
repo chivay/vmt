@@ -82,9 +82,5 @@ pub fn logger(comptime prefix: []const u8) type {
         pub fn critical(self: @This(), comptime fmt: []const u8, args: anytype) void {
             self.log_raw(LogLevel.Critical, fmt, args);
         }
-
-        pub fn childOf(comptime child_prefix: []const u8) type {
-            return logger(PREFIX ++ "." ++ child_prefix);
-        }
     };
 }

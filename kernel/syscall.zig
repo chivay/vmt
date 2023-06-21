@@ -1,6 +1,6 @@
 const kernel = @import("root");
 
-const logger = @TypeOf(kernel.logger).childOf(@typeName(@This())){};
+const logger = kernel.logging.logger(@typeName(@This())){};
 
 var sys_no: u32 = 0;
 
