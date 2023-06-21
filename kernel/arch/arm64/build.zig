@@ -4,7 +4,8 @@ const Builder = std.build.Builder;
 const CrossTarget = std.zig.CrossTarget;
 const Arch = std.Target.Cpu.Arch;
 
-pub fn build(kernel: *std.build.LibExeObjStep) void {
+pub fn build(b: *Builder, kernel: *std.build.LibExeObjStep) void {
+    _ = b;
     const builder = kernel.builder;
     const cross_target = CrossTarget{
         .cpu_arch = Arch.aarch64,

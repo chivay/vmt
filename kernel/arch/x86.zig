@@ -289,7 +289,7 @@ pub const TaskRegs = packed struct {
         const reg_area_size = @sizeOf(u64) * 7;
         var reg_area = thread_stack[thread_stack.len - reg_area_size ..];
         var rip_area = reg_area[6 * @sizeOf(u64) ..];
-        std.mem.set(u8, reg_area, 0);
+        @memset(reg_area, 0);
         std.mem.writeIntNative(u64, @ptrCast(*[8]u8, rip_area), @ptrToInt(func));
         return TaskRegs{ .rsp = @ptrToInt(reg_area.ptr), .stack_bottom = @ptrToInt(reg_area.ptr) };
     }
@@ -1019,7 +1019,7 @@ const exception_stubs = init: {
     @setEvalBranchQuota(100000);
     var stubs: [256]InterruptStub = undefined;
 
-    for (stubs) |*pt, i| {
+    for (stubs, 0..) |*pt, i| {
         pt.* = &exception_stub(i);
     }
 
@@ -1162,7 +1162,6 @@ pub fn init_cpu() !void {
     //GSBASE.write(@ptrToInt(&boot_cpu_gsstruct));
 
     setup_syscall();
-
 }
 
 pub fn init() void {

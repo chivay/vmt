@@ -282,7 +282,7 @@ pub const VirtualMemoryImpl = struct {
         options: *const MapOptions,
     ) !mm.VirtualMemoryRange {
         // Align to smallest page
-        var left = std.mem.alignForward(size, PageKind.Page4K.size());
+        var left = std.mem.alignForward(usize, size, PageKind.Page4K.size());
 
         var done: usize = 0;
         var unit: PageKind = undefined;
@@ -427,7 +427,7 @@ fn map_kernel_image(vm: *mm.VirtualMemory) !void {
     _ = vm.map_memory(
         KERNEL_IMAGE.base,
         PhysicalAddress.new(0),
-        std.mem.alignForward(kernel_size, lib.MiB(2)),
+        std.mem.alignForward(usize, kernel_size, lib.MiB(2)),
         mm.VirtualMemory.Protection.RWX,
     ) catch |err| {
         logger.log("{}\n", .{err});

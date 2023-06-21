@@ -69,7 +69,7 @@ pub const VGADevice = struct {
     fn clear_row(idx: u16) void {
         std.debug.assert(idx < VGA_HEIGHT);
         const entry = make_entry(' ', default_color);
-        std.mem.set(u16, get_buffer()[idx][0..], entry);
+        @memset(get_buffer()[idx][0..], entry);
     }
 
     pub fn scroll_row() void {

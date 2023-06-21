@@ -15,7 +15,7 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           zigpkgs = zig.packages.${system};
-          vmtZig = zigpkgs."0.10.1";
+          vmtZig = zigpkgs."master";
         in
         {
           packages.vmt = pkgs.stdenv.mkDerivation {

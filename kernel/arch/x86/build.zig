@@ -3,9 +3,10 @@ const std = @import("std");
 const Arch = std.Target.Cpu.Arch;
 const CrossTarget = std.zig.CrossTarget;
 const CpuFeature = std.Target.Cpu.Feature;
+const Builder = std.build.Builder;
 
-pub fn build(kernel: *std.build.LibExeObjStep) void {
-    const builder = kernel.builder;
+pub fn build(b: *Builder, kernel: *std.build.LibExeObjStep) void {
+    const builder = b;
     var kernel_tls = builder.step("kernel", "Build kernel ELF");
 
     const cross_target = CrossTarget{
@@ -32,18 +33,23 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
         .os_tag = std.Target.Os.Tag.freestanding,
         .abi = std.Target.Abi.none,
     };
-    kernel.setTarget(cross_target);
+    kernel.target = cross_target;
     kernel.code_model = std.builtin.CodeModel.kernel;
     kernel.want_lto = false;
 
     kernel.setLinkerScriptPath(.{ .path = "kernel/arch/x86/linker.ld" });
     kernel.addAssemblyFile("kernel/arch/x86/boot.S");
-    kernel.setOutputDir("build/x86_64");
+    //kernel.setOutputDir("build/x86_64");
 
     kernel_tls.dependOn(&kernel.step);
 
-    const trampolines = builder.addAssemble("trampolines", "kernel/arch/x86/trampolines.S");
-    trampolines.setOutputDir("build/x86_64");
+    const trampolines = builder.addAssembly(.{
+        .name = "trampolines",
+        .source_file = .{ .path = "kernel/arch/x86/trampolines.S"},
+        .target = cross_target,
+        .optimize = .Debug,
+    });
+    //trampolines.setOutputDir("build/x86_64");
     kernel.step.dependOn(&trampolines.step);
 
     var iso_tls = builder.step("iso", "Build multiboot ISO");

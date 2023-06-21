@@ -58,7 +58,7 @@ pub fn logger(comptime prefix: []const u8) type {
         }
 
         fn log_raw(self: @This(), comptime level: LogLevel, comptime fmt: []const u8, args: anytype) void {
-            if (comptime (@enumToInt(level) <= @enumToInt(self.log_level))) {
+            if ((@enumToInt(level) <= @enumToInt(self.log_level))) {
                 printk("[" ++ @tagName(level) ++ "] " ++ PREFIX ++ ": " ++ fmt, args);
             }
         }

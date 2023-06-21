@@ -21,9 +21,9 @@ pub fn worker2() noreturn {
 
 
 pub fn kmain() void {
-    arch.init_cpu() catch {
-        @panic("Failed to initialize the CPU");
-    };
+    //arch.init_cpu() catch {
+    //    @panic("Failed to initialize the CPU");
+    //};
 
     mm.init();
     arch.init();

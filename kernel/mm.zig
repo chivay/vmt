@@ -104,7 +104,7 @@ fn AddrWrapper(comptime name: []const u8, comptime T: type) type {
         }
 
         pub fn alignForward(self: Self, val: anytype) Self {
-            return Self.new(std.mem.alignForward(self.value, val));
+            return Self.new(std.mem.alignForward(T, self.value, val));
         }
 
         pub fn format(self: Self, fmt: []const u8, options: std.fmt.FormatOptions, stream: anytype) !void {
@@ -267,7 +267,7 @@ pub const MemoryAllocator = struct {
     }
 
     pub fn alloc_bytes(self: *Self, size: usize) ![]align(0x10) u8 {
-        var real_size = std.mem.alignForward(size, 0x10);
+        var real_size = std.mem.alignForward(usize, size, 0x10);
 
         if (self.main_chunk == null or self.main_chunk.?.len < real_size) {
             const frame = (try self.frame_allocator.alloc_frame());
@@ -282,7 +282,7 @@ pub const MemoryAllocator = struct {
         if (real_size <= self.main_chunk.?.len) {
             var result = self.main_chunk.?[0..real_size];
             var rest = self.main_chunk.?[real_size..];
-            self.main_chunk = @intToPtr([]align(16) u8, @ptrToInt(rest.ptr));
+            self.main_chunk = @alignCast(16, rest);
             return result;
         }
         return error{OutOfMemory}.OutOfMemory;
@@ -318,7 +318,7 @@ pub const FrameAllocator = struct {
     pub fn alloc_zero_frame(self: *Self) !PhysicalAddress {
         const frame = try self.alloc_frame();
         const buf = directMapping().to_virt(frame).into_pointer(*[PAGE_SIZE]u8);
-        std.mem.set(u8, buf, 0);
+        @memset(buf, 0);
 
         return frame;
     }
