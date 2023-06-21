@@ -19,7 +19,6 @@ pub fn worker2() noreturn {
     }
 }
 
-
 pub fn kmain() void {
     //arch.init_cpu() catch {
     //    @panic("Failed to initialize the CPU");
@@ -39,7 +38,6 @@ pub fn kmain() void {
     var taskC = Task.create(&worker2) catch {
         @panic("Failed to allocate a task");
     };
-
 
     var scheduler = task.scheduler();
     scheduler.addTask(taskA);

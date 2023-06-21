@@ -16,18 +16,18 @@ pub fn build(b: *Builder, kernel: *std.build.LibExeObjStep) void {
             .soft_float,
         }),
         .cpu_features_sub = std.Target.x86.featureSet(&[_]std.Target.x86.Feature{
-             .cmov,
-             .cx8,
-             .fxsr,
-             .macrofusion,
-             .mmx,
-             .nopl,
-             .slow_3ops_lea,
-             .slow_incdec,
-             .sse,
-             .sse2,
+            .cmov,
+            .cx8,
+            .fxsr,
+            .macrofusion,
+            .mmx,
+            .nopl,
+            .slow_3ops_lea,
+            .slow_incdec,
+            .sse,
+            .sse2,
             .vzeroupper,
-             .x87,
+            .x87,
         }),
 
         .os_tag = std.Target.Os.Tag.freestanding,
@@ -45,7 +45,7 @@ pub fn build(b: *Builder, kernel: *std.build.LibExeObjStep) void {
 
     const trampolines = builder.addAssembly(.{
         .name = "trampolines",
-        .source_file = .{ .path = "kernel/arch/x86/trampolines.S"},
+        .source_file = .{ .path = "kernel/arch/x86/trampolines.S" },
         .target = cross_target,
         .optimize = .Debug,
     });

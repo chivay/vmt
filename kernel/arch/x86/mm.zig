@@ -114,13 +114,15 @@ pub const VirtualMemoryImpl = struct {
             pub fn walk(self: *@This(), virt: VirtualAddress, phys: PhysicalAddress, page_size: usize) void {
                 // TODO: fix those mappings
                 switch (page_size) {
-                        0x1000 => self.arch_vm.map_page_4kb(virt, phys, &MapOptions{.writable=true, .write_through = false,.cache_disable = false, .no_execute=false, .user=false }) catch unreachable,
-                        0x200000 => self.arch_vm.map_page_2mb(virt, phys, &MapOptions{.writable=true, .write_through = false,.cache_disable = false, .no_execute=false, .user=false }) catch unreachable,
-                        else => @panic("wtf"),
+                    0x1000 => self.arch_vm.map_page_4kb(virt, phys, &MapOptions{ .writable = true, .write_through = false, .cache_disable = false, .no_execute = false, .user = false, }) catch unreachable,
+                    0x200000 => self.arch_vm.map_page_2mb(virt, phys, &MapOptions{ .writable = true, .write_through = false, .cache_disable = false, .no_execute = false, .user = false, }) catch unreachable,
+                    else => @panic("wtf"),
                 }
             }
 
-            pub fn done(self: *@This()) void { _ = self; }
+            pub fn done(self: *@This()) void {
+                _ = self;
+            }
         }{ .arch_vm = arch_vm };
         source.walk(@TypeOf(ctx), &ctx);
 

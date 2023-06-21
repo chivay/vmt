@@ -53,7 +53,7 @@ pub var init_task = Task{
     .vm = mm.getKernelVM(),
     .regs = std.mem.zeroes(kernel.arch.TaskRegs),
     .stack = &[_]u8{},
-    .next = .{.data = {}},
+    .next = .{ .data = {} },
 };
 
 pub const Scheduler = struct {
