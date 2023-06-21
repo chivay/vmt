@@ -71,7 +71,7 @@ pub fn build(b: *Builder, kernel: *std.build.LibExeObjStep) void {
     qemu.addArgs(&[_][]const u8{
         "-enable-kvm",
         "-cdrom",
-        "build/x86_64/kernel.iso",
+        "build/kernel.iso",
         "-s",
         "-serial",
         "stdio",

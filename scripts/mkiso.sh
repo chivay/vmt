@@ -8,5 +8,7 @@ cat - ./scripts/grub.cfg <<EOF > $TMPDIR/boot/grub/grub.cfg
 set cmdline="${CMDLINE}"
 EOF
 
-grub-mkrescue -o $(dirname $KERNEL_ELF)/kernel.iso $TMPDIR 2> /dev/null
+mkdir -p build
+
+grub-mkrescue -o build/kernel.iso $TMPDIR 2> /dev/null
 rm -rf $TMPDIR
