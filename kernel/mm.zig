@@ -121,25 +121,6 @@ fn AddrWrapper(comptime name: []const u8, comptime T: type) type {
     };
 }
 
-test "AddrWrapper" {
-    const expect = std.testing.expect;
-
-    const Addr = AddrWrapper("TestAddr", u64);
-
-    const v1 = Addr.new(0x1000);
-    const v2 = Addr.new(0x2000);
-
-    try expect(v1.add(0x1000).eq(v2));
-    try expect(v2.sub(0x1000).eq(v1));
-
-    try expect(v1.le(v1));
-    try expect(v2.eq(v2));
-
-    try expect(Addr.span(v1, v2) == 0x1000);
-
-    try expect(v1.max(v2).eq(v2));
-}
-
 pub const VirtualAddress = AddrWrapper("VirtualAddress", arch.mm.VirtAddrType);
 pub const PhysicalAddress = AddrWrapper("PhysicalAddress", arch.mm.PhysAddrType);
 

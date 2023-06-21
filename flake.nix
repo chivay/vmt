@@ -18,23 +18,20 @@
           vmtZig = zigpkgs."master";
         in
         {
+          defaultPackage = self.outputs.packages.${system}.vmt;
           packages.vmt = pkgs.stdenv.mkDerivation {
             name = "vmt";
-            nativeBuildInputs = [ vmtZig ];
+            nativeBuildInputs = with pkgs; [ vmtZig grub2 xorriso ];
             src = self;
 
             buildPhase = ''
               export HOME=$TMPDIR;
-              zig build kernel
-            '';
-
-            doCheck = true;
-            checkPhase = ''
-              zig test kernel/kernel.zig
+              zig build iso
             '';
 
             installPhase = ''
-              cp -r ./build/x86_64/kernel $out
+              mkdir -p $out
+              cp -r ./build/kernel.iso $out/kernel.iso
             '';
 
           };

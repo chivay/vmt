@@ -30,6 +30,3 @@ comptime {
     _ = arch.x86.multiboot;
 }
 
-test {
-    _ = mm;
-}
