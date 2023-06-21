@@ -67,7 +67,7 @@ fn apEntry() callconv(.C) noreturn {
 }
 
 fn patchEntrypoint(buffer: []u8, offset: u64) void {
-    const entry = @ptrToInt(apEntry);
+    const entry = @ptrToInt(&apEntry);
     std.mem.writeIntSliceLittle(
         u64,
         buffer[offset .. offset + @sizeOf(u64)],

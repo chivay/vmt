@@ -312,7 +312,7 @@ pub const VirtualMemoryImpl = struct {
                 unit = PageKind.Page4K;
             }
 
-            logger.debug("Mapping {} to {} ({x})\n", .{ what_addr, where_addr, unit });
+            logger.debug("Mapping {} to {} ({})\n", .{ what_addr, where_addr, unit });
             self.map_addr(where_addr, what_addr, unit.size(), options) catch |err| {
                 logger.log("{}\n", .{err});
                 @panic("Failed to setup direct mapping");

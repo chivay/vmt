@@ -72,7 +72,7 @@ comptime {
     std.debug.assert(@offsetOf(Struct, "length") == 20);
 }
 
-const SDTHeader = packed struct {
+const SDTHeader = extern struct {
     signature: [4]u8,
     length: u32,
     revision: u8,

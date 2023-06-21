@@ -2,7 +2,7 @@ const std = @import("std");
 const kernel = @import("root");
 
 const SinglyLinkedList = std.SinglyLinkedList;
-pub const PrintkSink = fn ([]const u8) void;
+pub const PrintkSink = *const fn ([]const u8) void;
 
 pub const SinkNode: type = SinglyLinkedList(PrintkSink).Node;
 
@@ -83,7 +83,7 @@ pub fn logger(comptime prefix: []const u8) type {
             self.log_raw(LogLevel.Critical, fmt, args);
         }
 
-        pub fn childOf(child_prefix: []const u8) type {
+        pub fn childOf(comptime child_prefix: []const u8) type {
             return logger(PREFIX ++ "." ++ child_prefix);
         }
     };

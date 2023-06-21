@@ -1,8 +1,10 @@
 const std = @import("std");
 const mm = @import("root").mm;
 const x86 = @import("../x86.zig");
+const logging = @import("root").logging;
 usingnamespace @import("root").lib;
-pub var logger = @TypeOf(x86.logger).childOf(@typeName(@This())){};
+
+pub var logger = logging.logger(@typeName(@This())){};
 
 fn alignTo8(n: usize) usize {
     const mask = 0b111;
@@ -46,17 +48,21 @@ pub const TagType = enum(u32) {
 
 const MULTIBOOT2_MAGIC = 0x36d76289;
 
-pub const Header = packed struct {
-    magic: u32 = MAGIC,
-    architecture: u32,
-    header_length: u32,
-    checksum: u32,
+comptime {
+    std.debug.assert(@sizeOf(Header) == 16);
+}
+
+pub const Header = extern struct {
+    magic: u32 align(1) = MAGIC,
+    architecture: u32 align(1),
+    header_length: u32 align(1),
+    checksum: u32 align(1),
 
     const MAGIC = 0xE85250D6;
-    pub const Tag = packed struct {
-        typ: u16,
-        flags: u16,
-        size: u32,
+    pub const Tag = extern struct {
+        typ: u16 align(1),
+        flags: u16 align(1),
+        size: u32 align(1),
     };
 
     pub fn init(arch: Arch, length: u32) Header {
@@ -67,20 +73,20 @@ pub const Header = packed struct {
         };
     }
 
-    pub const NilTag = packed struct {
+    pub const NilTag = extern struct {
         const field_size = @sizeOf(Tag);
-        tag: Tag = .{
+        tag: Tag align(1) = .{
             .typ = 0,
             .flags = 0,
             .size = 8,
         },
 
         // Force 8-aligned struct size for each tag
-        _pad: [alignTo8(field_size)]u8 = undefined,
+        _pad: [alignTo8(field_size)]u8 align(1) = undefined,
     };
 
-    pub fn InformationRequestTag(n: u32) type {
-        return packed struct {
+    pub fn InformationRequestTag(comptime n: u32) type {
+        return extern struct {
             const field_size = @sizeOf(Tag) + @sizeOf([n]u32);
             tag: Tag = .{
                 .typ = 1,
@@ -89,11 +95,11 @@ pub const Header = packed struct {
             },
             mbi_tag_types: [n]u32,
 
-            _pad: [alignTo8(field_size)]u8 = undefined,
+            _pad: [alignTo8(field_size)]u8 = std.mem.zeroes([alignTo8(field_size)]u8),
         };
     }
 
-    pub const FramebufferTag = packed struct {
+    pub const FramebufferTag = extern struct {
         const field_size = @sizeOf(Tag) + 3 * @sizeOf(u32);
 
         tag: Tag = .{
@@ -105,7 +111,7 @@ pub const Header = packed struct {
         height: u32,
         depth: u32,
 
-        _pad: [alignTo8(field_size)]u8 = undefined,
+        _pad: [alignTo8(field_size)]u8 = std.mem.zeroes([alignTo8(field_size)]u8),
     };
 };
 
@@ -125,14 +131,14 @@ const total_size = @sizeOf(Header) + tag_buffer.len + nil_tag.len;
 export const mbheader align(8) linksection(".multiboot") =
     std.mem.toBytes(Header.init(Arch.I386, total_size)) ++ tag_buffer ++ nil_tag;
 
-const BootInfoStart = packed struct {
-    total_size: u32,
-    reserved: u32,
+const BootInfoStart = extern struct {
+    total_size: u32 align(1),
+    reserved: u32 align(1),
 };
 
-const BootInfoHeader = packed struct {
-    typ: u32,
-    size: u32,
+const BootInfoHeader = extern struct {
+    typ: u32 align(1),
+    size: u32 align(1),
 };
 
 pub var mb_phys: ?mm.PhysicalAddress = null;
@@ -141,7 +147,14 @@ pub var loader_magic: u32 = undefined;
 export fn multiboot_entry(info: u32, magic: u32) callconv(.C) noreturn {
     mb_phys = mm.PhysicalAddress.new(info);
     loader_magic = magic;
-    @call(.{ .stack = x86.stack[0..] }, x86.boot_entry, .{});
+    asm volatile (
+        \\ jmp *%[target]
+        :
+        : [stack] "{rsp}" (@ptrToInt(&x86.stack) + @sizeOf(@TypeOf(x86.stack))),
+          [target] "{rax}" (&x86.boot_entry),
+    );
+    unreachable;
+    //@call(.{ .stack = x86.stack[0..] }, x86.boot_entry, .{});
 }
 
 fn get_multiboot_tag(tag: TagType) ?[]u8 {

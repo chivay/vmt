@@ -19,7 +19,7 @@ pub fn flushTlb() void {
 pub const PT = struct {
     root: PhysicalAddress,
     base: ?VirtualAddress,
-    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.directTranslate,
+    phys2virt: *const fn (PhysicalAddress) VirtualAddress = &kernel.mm.directTranslate,
 
     const EntryType = u64;
     const IdxType = u9;
@@ -121,7 +121,7 @@ pub const PageKind = enum {
 pub const PD = struct {
     root: PhysicalAddress,
     base: ?VirtualAddress,
-    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.directTranslate,
+    phys2virt: *const fn (PhysicalAddress) VirtualAddress = &kernel.mm.directTranslate,
 
     const EntryType = u64;
     const IdxType = u9;
@@ -243,7 +243,7 @@ pub const PD = struct {
 pub const PDPT = struct {
     root: PhysicalAddress,
     base: ?VirtualAddress,
-    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.directTranslate,
+    phys2virt: *const fn (PhysicalAddress) VirtualAddress = kernel.mm.directTranslate,
 
     const IdxType = u9;
     const EntryType = u64;
@@ -342,7 +342,7 @@ pub const PML4 = struct {
     root: PhysicalAddress,
     // Missing base implies 4 level paging scheme
     base: ?VirtualAddress,
-    phys2virt: fn (PhysicalAddress) VirtualAddress = kernel.mm.directTranslate,
+    phys2virt: *const fn (PhysicalAddress) VirtualAddress = &kernel.mm.directTranslate,
 
     const IdxType = u9;
     const EntryType = u64;

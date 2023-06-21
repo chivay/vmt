@@ -11,19 +11,22 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
     const cross_target = CrossTarget{
         .cpu_arch = Arch.x86_64,
         .cpu_model = CrossTarget.CpuModel.baseline,
+        .cpu_features_add = std.Target.x86.featureSet(&[_]std.Target.x86.Feature{
+            .soft_float,
+        }),
         .cpu_features_sub = std.Target.x86.featureSet(&[_]std.Target.x86.Feature{
-            .cmov,
-            .cx8,
-            .fxsr,
-            .macrofusion,
-            .mmx,
-            .nopl,
-            .slow_3ops_lea,
-            .slow_incdec,
-            .sse,
-            .sse2,
+             .cmov,
+             .cx8,
+             .fxsr,
+             .macrofusion,
+             .mmx,
+             .nopl,
+             .slow_3ops_lea,
+             .slow_incdec,
+             .sse,
+             .sse2,
             .vzeroupper,
-            .x87,
+             .x87,
         }),
 
         .os_tag = std.Target.Os.Tag.freestanding,
@@ -74,6 +77,8 @@ pub fn build(kernel: *std.build.LibExeObjStep) void {
         "q35",
         "-smp",
         cpus,
+        "-d",
+        "cpu_reset",
     });
 
     if (use_uefi) {

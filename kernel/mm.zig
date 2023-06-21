@@ -267,7 +267,9 @@ pub const MemoryAllocator = struct {
     }
 
     pub fn alloc_bytes(self: *Self, size: usize) ![]align(0x10) u8 {
-        if (self.main_chunk == null or self.main_chunk.?.len < size) {
+        var real_size = std.mem.alignForward(size, 0x10);
+
+        if (self.main_chunk == null or self.main_chunk.?.len < real_size) {
             const frame = (try self.frame_allocator.alloc_frame());
             const virt = directTranslate(frame);
 
@@ -277,10 +279,10 @@ pub const MemoryAllocator = struct {
             self.main_chunk = main_chunk;
         }
 
-        if (size <= self.main_chunk.?.len) {
-            var result = self.main_chunk.?[0..size];
-            var rest = self.main_chunk.?[size..];
-            self.main_chunk = rest;
+        if (real_size <= self.main_chunk.?.len) {
+            var result = self.main_chunk.?[0..real_size];
+            var rest = self.main_chunk.?[real_size..];
+            self.main_chunk = @intToPtr([]align(16) u8, @ptrToInt(rest.ptr));
             return result;
         }
         return error{OutOfMemory}.OutOfMemory;

@@ -11,7 +11,7 @@ pub const logger = logging.logger("kernel"){};
 
 const std = @import("std");
 
-pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace) noreturn {
+pub fn panic(msg: []const u8, _: ?*std.builtin.StackTrace, _: ?usize) noreturn {
     logger.critical("PANIK: {s}\n", .{msg});
 
     var it = std.debug.StackIterator.init(@returnAddress(), null);

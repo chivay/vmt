@@ -1,6 +1,6 @@
 const x86 = @import("../x86.zig");
 
-fn PIC(port_base: u32) type {
+fn PIC(comptime port_base: u32) type {
     return struct {
         const COMMAND_PORT = port_base;
         const DATA_PORT = port_base + 1;

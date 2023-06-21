@@ -13,7 +13,7 @@ pub const Task = struct {
 
     const Self = @This();
     pub const NextNode = std.TailQueue(void).Node;
-    pub fn create(func: fn () noreturn) !*Task {
+    pub fn create(func: *const fn () noreturn) !*Task {
         var task = try mm.memoryAllocator().alloc(Task);
         var stack = try mm.memoryAllocator().alloc([arch.KERNEL_STACK_SIZE]u8);
         task.regs = arch.TaskRegs.setup(func, stack);
@@ -24,7 +24,6 @@ pub const Task = struct {
     }
 
     pub fn format(self: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, stream: anytype) !void {
-        _ = fmt;
         try stream.writeAll(@typeName(Self));
         try stream.writeAll("{");
         try std.fmt.formatType(self.regs, fmt, options, stream, 1);
@@ -54,7 +53,7 @@ pub var init_task = Task{
     .vm = mm.getKernelVM(),
     .regs = std.mem.zeroes(kernel.arch.TaskRegs),
     .stack = &[_]u8{},
-    .next = .{.data = .{}},
+    .next = .{.data = {}},
 };
 
 pub const Scheduler = struct {

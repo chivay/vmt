@@ -2,18 +2,25 @@
   description = "VMT - toy OS written in Zig";
   nixConfig.bash-prompt = "\[vmt-develop\]$ ";
 
-  inputs.flake-utils.url = "github:numtide/flake-utils";
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+  inputs = {
+    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    zig.url = "github:mitchellh/zig-overlay";
+    zig.inputs.nixpkgs.follows = "nixpkgs";
+  };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, zig }:
     flake-utils.lib.eachDefaultSystem
       (system:
-        let pkgs = nixpkgs.legacyPackages.${system};
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          zigpkgs = zig.packages.${system};
+          vmtZig = zigpkgs."0.10.1";
         in
         {
           packages.vmt = pkgs.stdenv.mkDerivation {
             name = "vmt";
-            nativeBuildInputs = [ pkgs.zig ];
+            nativeBuildInputs = [ vmtZig ];
             src = self;
 
             buildPhase = ''
@@ -31,7 +38,10 @@
             '';
 
           };
-          devShell = pkgs.mkShell { buildInputs = with pkgs; [ zig qemu grub2 xorriso bochs nixpkgs-fmt ]; };
+
+          devShell = pkgs.mkShell {
+            buildInputs = with pkgs; [ qemu grub2 xorriso bochs nixpkgs-fmt ] ++ [vmtZig];
+          };
         }
       );
 }

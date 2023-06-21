@@ -25,14 +25,17 @@ comptime {
     _ = multiboot;
 }
 
-pub const logger = @TypeOf(kernel.logger).childOf(@typeName(@This())){};
+pub var logger = kernel.logging.logger(@typeName(@This())){};
 
 const GDT = gdt.GlobalDescriptorTable(8);
 const IDT = InterruptDescriptorTable;
 
 pub var main_gdt align(64) = GDT.new();
 pub var main_tss align(64) = std.mem.zeroes(gdt.TSS);
-pub var main_idt align(64) = std.mem.zeroes(IDT);
+pub var main_idt align(64) = blk: {
+    @setEvalBranchQuota(10000);
+    break :blk std.mem.zeroes(IDT);
+};
 
 /// Physical-address width supported by the processor. <= 52
 pub var cpu_phys_bits: u6 = undefined;
@@ -281,7 +284,7 @@ pub const TaskRegs = packed struct {
 
     const Self = @This();
 
-    pub fn setup(func: fn () noreturn, thread_stack: []u8) TaskRegs {
+    pub fn setup(func: *const fn () noreturn, thread_stack: []u8) TaskRegs {
         // 7 == #saved registers + return address
         const reg_area_size = @sizeOf(u64) * 7;
         var reg_area = thread_stack[thread_stack.len - reg_area_size ..];
@@ -300,10 +303,10 @@ pub const TaskRegs = packed struct {
     }
 };
 
-pub const InterruptDescriptorTable = packed struct {
+pub const InterruptDescriptorTable = extern struct {
     entries: [256]Entry,
 
-    pub const Entry = packed struct {
+    pub const Entry = extern struct {
         raw: packed struct {
             offset_low: u16,
             selector: u16,
@@ -402,7 +405,7 @@ pub fn syscall_supported() bool {
     return ((info.edx >> 11) & 1) != 0;
 }
 
-pub fn MSR(n: u32) type {
+pub fn MSR(comptime n: u32) type {
     return struct {
         pub inline fn read() u64 {
             return rdmsr(n);
@@ -460,7 +463,7 @@ pub fn boot_entry() noreturn {
     logger.debug("Kernel end: {x}\n", .{mm.get_kernel_end()});
 
     logger.info("Booting the kernel...\n", .{});
-    logger.info("Command line: {s}\n", .{multiboot.get_cmdline()});
+    logger.info("Command line: {??s}\n", .{multiboot.get_cmdline()});
     kernel.main.kmain();
 
     hang();
@@ -933,7 +936,7 @@ fn keyboard_echo() void {
 }
 
 pub const IrqRegistration = struct {
-    func: fn () void,
+    func: *fn () void,
     next: ?*IrqRegistration,
 
     pub fn new(func: fn () void) @This() {
@@ -1017,7 +1020,7 @@ const exception_stubs = init: {
     var stubs: [256]InterruptStub = undefined;
 
     for (stubs) |*pt, i| {
-        pt.* = exception_stub(i);
+        pt.* = &exception_stub(i);
     }
 
     break :init stubs;
@@ -1092,7 +1095,7 @@ fn setup_syscall() void {
     const sysret_selector = @as(u64, user_base.raw);
     const syscall_selector = @as(u64, null_entry.raw);
     IA32_STAR.write((sysret_selector << 48) | (syscall_selector << 32));
-    IA32_LSTAR.write(@ptrToInt(syscall_entry));
+    IA32_LSTAR.write(@ptrToInt(&syscall_entry));
 }
 
 pub var null_entry: gdt.SegmentSelector = undefined;
@@ -1145,18 +1148,18 @@ pub fn init_cpu() !void {
 
     ltr(tss_base.raw);
 
-    for (exception_stubs) |ptr, i| {
-        const addr: u64 = @ptrToInt(ptr);
-        const dpl: gdt.PrivilegeLevel = switch (i) {
-            @enumToInt(CpuException.Breakpoint) => .Ring3,
-            else => .Ring0,
-        };
-        main_idt.set_entry(@intCast(u16, i), IDT.Entry.new(addr, kernel_code, 0, dpl));
-    }
+    //for (exception_stubs) |ptr, i| {
+    //    const addr: u64 = @ptrToInt(ptr);
+    //    const dpl: gdt.PrivilegeLevel = switch (i) {
+    //        @enumToInt(CpuException.Breakpoint) => .Ring3,
+    //        else => .Ring0,
+    //    };
+    //    main_idt.set_entry(@intCast(u16, i), IDT.Entry.new(addr, kernel_code, 0, dpl));
+    //}
 
     main_idt.load();
 
-    GSBASE.write(@ptrToInt(&boot_cpu_gsstruct));
+    //GSBASE.write(@ptrToInt(&boot_cpu_gsstruct));
 
     setup_syscall();
 
@@ -1164,12 +1167,12 @@ pub fn init_cpu() !void {
 
 pub fn init() void {
     pic.init();
-    framebuffer.init();
-    pit.init();
-    trampoline.init();
-    acpi.init();
-    apic.init();
-    timer.init();
-    pci.init();
-    smp.init();
+    //framebuffer.init();
+    //pit.init();
+    //trampoline.init();
+    //acpi.init();
+    //apic.init();
+    //timer.init();
+    //pci.init();
+    //smp.init();
 }

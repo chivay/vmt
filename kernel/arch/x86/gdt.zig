@@ -2,14 +2,14 @@ const std = @import("std");
 const assert = std.debug.assert;
 const x86 = @import("../x86.zig");
 
-pub const TSS = packed struct {
-    _reserved1: u32,
-    rsp: [3]u64,
-    _reserved2: u32,
-    _reserved3: u32,
-    ist: [8]u64,
-    _reserved4: u16,
-    io_map_addr: u16,
+pub const TSS = extern struct {
+    _reserved1: u32 align(1),
+    rsp: [3]u64 align(1),
+    _reserved2: u32 align(1),
+    _reserved3: u32 align(1),
+    ist: [8]u64 align(1),
+    _reserved4: u16 align(1),
+    io_map_addr: u16 align(1),
 };
 
 comptime {
@@ -37,8 +37,8 @@ pub const SegmentSelector = struct {
     }
 };
 
-pub fn GlobalDescriptorTable(n: u16) type {
-    return packed struct {
+pub fn GlobalDescriptorTable(comptime n: u16) type {
+    return struct {
         entries: [n]Entry align(0x10),
         free_slot: u16,
 

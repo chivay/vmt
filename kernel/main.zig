@@ -30,13 +30,13 @@ pub fn kmain() void {
 
     const Task = task.Task;
 
-    var taskA = Task.create(usermode) catch {
+    var taskA = Task.create(&usermode) catch {
         @panic("Failed to allocate a task");
     };
-    var taskB = Task.create(usermode) catch {
+    var taskB = Task.create(&usermode) catch {
         @panic("Failed to allocate a task");
     };
-    var taskC = Task.create(worker2) catch {
+    var taskC = Task.create(&worker2) catch {
         @panic("Failed to allocate a task");
     };
 
@@ -48,7 +48,7 @@ pub fn kmain() void {
 
     logger.info("Enabling interrupts\n", .{});
 
-    arch.enable_interrupts();
+    //arch.enable_interrupts();
     arch.idle();
 }
 
