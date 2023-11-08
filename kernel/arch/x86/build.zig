@@ -38,7 +38,7 @@ pub fn build(b: *Builder, kernel: *std.build.LibExeObjStep) void {
     kernel.want_lto = false;
 
     kernel.setLinkerScriptPath(.{ .path = "kernel/arch/x86/linker.ld" });
-    kernel.addAssemblyFile( .{ .path = "kernel/arch/x86/boot.S"});
+    kernel.addAssemblyFile(.{ .path = "kernel/arch/x86/boot.S" });
     //kernel.setOutputDir("build/x86_64");
 
     kernel_tls.dependOn(&kernel.step);

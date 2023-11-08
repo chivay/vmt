@@ -185,7 +185,7 @@ pub const MCFGIterator = struct {
 
     pub fn next(self: *@This()) ?*const MCFGEntry {
         if (self.data.len < @sizeOf(MCFGEntry)) return null;
-        const entry = @as(*const MCFGEntry,  @ptrCast(self.data));
+        const entry = @as(*const MCFGEntry, @ptrCast(self.data));
         self.data = self.data[@sizeOf(MCFGEntry)..];
         return entry;
     }
@@ -256,7 +256,7 @@ pub const MADTIterator = struct {
 
     pub fn init(header: *SDTHeader) MADTIterator {
         const data_length = header.length - @sizeOf(SDTHeader);
-        var data = @as([*]u8,@ptrFromInt(@intFromPtr(header) + @sizeOf(SDTHeader)))[0..data_length];
+        var data = @as([*]u8, @ptrFromInt(@intFromPtr(header) + @sizeOf(SDTHeader)))[0..data_length];
         var entry_data = data[@sizeOf(MADTInfo)..];
 
         return .{ .data = entry_data };

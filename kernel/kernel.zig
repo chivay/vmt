@@ -29,4 +29,3 @@ pub fn getCoreBlock() *arch.CoreBlock {
 comptime {
     _ = arch.x86.multiboot;
 }
-
