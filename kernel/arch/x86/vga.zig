@@ -46,8 +46,8 @@ pub const VGADevice = struct {
     }
 
     pub fn make_color(back: Color, front: Color) u8 {
-        const b = @enumToInt(front);
-        const f = @enumToInt(back);
+        const b = @intFromEnum(front);
+        const f = @intFromEnum(back);
         return (@as(u8, b) << 4) | @as(u8, f);
     }
 
@@ -94,9 +94,9 @@ pub const VGADevice = struct {
         const pos = VGA_WIDTH * y + x;
 
         x86.out(u8, 0x3d4, 0x0f);
-        x86.out(u8, 0x3d5, @intCast(u8, pos & 0xff));
+        x86.out(u8, 0x3d5, @intCast(pos & 0xff));
         x86.out(u8, 0x3d4, 0x0e);
-        x86.out(u8, 0x3d5, @intCast(u8, (pos >> 8) & 0xff));
+        x86.out(u8, 0x3d5, @intCast((pos >> 8) & 0xff));
     }
 };
 

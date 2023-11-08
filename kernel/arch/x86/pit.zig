@@ -16,8 +16,8 @@ fn set_frequency_value(hz: u16) void {
     const value = 1193180 / @as(u32, hz);
     logger.debug("Setting the frequency to {}Hz\n", .{hz});
     x86.out(u8, PIT_CMD, 0x36);
-    x86.out(u8, PIT_CHANNEL_0, @truncate(u8, value));
-    x86.out(u8, PIT_CHANNEL_0, @truncate(u8, value >> 8));
+    x86.out(u8, PIT_CHANNEL_0, @truncate(value));
+    x86.out(u8, PIT_CHANNEL_0, @truncate(value >> 8));
 }
 
 fn read_reload_value() u16 {

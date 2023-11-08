@@ -25,12 +25,12 @@ pub fn intToEnumSafe(comptime T: type, value: std.meta.Tag(T)) ?T {
     };
 
     comptime if (enumInfo.is_exhaustive) {
-        return @intToEnum(T, value);
+        return @as(T, @enumFromInt(value));
     };
 
     inline for (enumInfo.fields) |enumField| {
         if (value == enumField.value) {
-            return @intToEnum(T, value);
+            return @enumFromInt(value);
         }
     }
     return null;

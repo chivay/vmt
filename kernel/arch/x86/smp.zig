@@ -28,7 +28,7 @@ fn patchCr3Value(buffer: []u8, offset: u64) void {
     std.mem.writeIntSliceLittle(
         u32,
         buffer[offset .. offset + @sizeOf(u32)],
-        @truncate(u32, cr3_value),
+        @truncate(cr3_value),
     );
 }
 
@@ -67,20 +67,20 @@ fn apEntry() callconv(.C) noreturn {
 }
 
 fn patchEntrypoint(buffer: []u8, offset: u64) void {
-    const entry = @ptrToInt(&apEntry);
+    const entry = @intFromPtr(&apEntry);
     std.mem.writeIntSliceLittle(
         u64,
         buffer[offset .. offset + @sizeOf(u64)],
-        @truncate(u64, entry),
+        @truncate(entry),
     );
 }
 
 fn patchRspValue(buffer: []u8, offset: u64) void {
-    const rsp_value = @ptrToInt(&ap_boot_stack) + @sizeOf(@TypeOf(ap_boot_stack));
+    const rsp_value = @intFromPtr(&ap_boot_stack) + @sizeOf(@TypeOf(ap_boot_stack));
     std.mem.writeIntSliceLittle(
         u64,
         buffer[offset .. offset + @sizeOf(u64)],
-        @truncate(u64, rsp_value),
+        @truncate(rsp_value),
     );
 }
 
@@ -88,23 +88,23 @@ fn patchSectionRel(buffer: []u8, offset: u64, addend: i64, typ: RelocType) void 
     // Relocate with respect to section address
     switch (typ) {
         .R_AMD64_16 => {
-            const val: u32 = TRAMPOLINE_BASE + @intCast(u32, addend);
+            const val: u32 = TRAMPOLINE_BASE + @as(u32, @intCast(addend));
             std.mem.writeIntSliceLittle(
                 u16,
                 buffer[offset .. offset + @sizeOf(u16)],
-                @truncate(u16, val),
+                @truncate(val),
             );
         },
         .R_AMD64_32 => {
-            const val: u32 = TRAMPOLINE_BASE + @intCast(u32, addend);
+            const val: u32 = TRAMPOLINE_BASE + @as(u32, @intCast(addend));
             std.mem.writeIntSliceLittle(
                 u32,
                 buffer[offset .. offset + @sizeOf(u32)],
-                @truncate(u32, val),
+                @truncate(val),
             );
         },
         .R_AMD64_64 => {
-            const val: u64 = TRAMPOLINE_BASE + @intCast(u64, addend);
+            const val: u64 = TRAMPOLINE_BASE + @as(u64, @intCast(addend));
             std.mem.writeIntSliceLittle(
                 u64,
                 buffer[offset .. offset + @sizeOf(u64)],
@@ -123,7 +123,7 @@ fn relocateStartupCode(buffer: []u8) void {
 
         const offset = rela.r_offset;
 
-        const typ = @intToEnum(RelocType, rela.r_type());
+        const typ = @as(RelocType, @enumFromInt(rela.r_type()));
         const symbol = x86.trampoline.getSymbol(rela.r_sym());
         const name = x86.trampoline.getString(symbol.?.st_name);
         const has_name = name != null;
@@ -183,7 +183,7 @@ const LapicIterator = struct {
             const typ_enum = typ.?;
             switch (typ_enum) {
                 .LocalApic => {
-                    return @ptrCast(*const x86.acpi.MADTLapic, header);
+                    return @as(*const x86.acpi.MADTLapic, @ptrCast(header));
                 },
                 else => return null,
             }
@@ -205,7 +205,7 @@ pub fn init() void {
     const PAGE_SIZE = 0x1000;
 
     const phys_start = try allocateTrampoline();
-    const start_page: u8 = @truncate(u8, (phys_start.value / PAGE_SIZE));
+    const start_page: u8 = @truncate((phys_start.value / PAGE_SIZE));
 
     const virt_start = mm.VirtualAddress.new(TRAMPOLINE_BASE);
     const trampoline = mm.getKernelVM().map_memory(

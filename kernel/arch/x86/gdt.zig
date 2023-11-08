@@ -25,7 +25,7 @@ pub const SegmentSelector = struct {
     raw: u16,
 
     pub fn new(_index: u16, _rpl: PrivilegeLevel) SegmentSelector {
-        return .{ .raw = _index << 3 | @enumToInt(_rpl) };
+        return .{ .raw = _index << 3 | @intFromEnum(_rpl) };
     }
 
     pub fn index(self: @This()) u16 {
@@ -33,7 +33,7 @@ pub const SegmentSelector = struct {
     }
 
     pub fn rpl(self: @This()) SegmentSelector {
-        return @intToEnum(PrivilegeLevel, self.raw & 0b11);
+        return @enumFromInt(self.raw & 0b11);
     }
 };
 
@@ -68,7 +68,7 @@ pub fn GlobalDescriptorTable(comptime n: u16) type {
 
             pub fn TaskState(tss: *TSS) [2]Entry {
                 var high: u64 = 0;
-                var ptr = @ptrToInt(tss);
+                var ptr = @intFromPtr(tss);
 
                 var low: u64 = 0;
                 low |= PRESENT;
@@ -100,7 +100,7 @@ pub fn GlobalDescriptorTable(comptime n: u16) type {
             self.entries[self.free_slot] = entry;
             self.free_slot += 1;
 
-            const dpl = @intToEnum(PrivilegeLevel, @intCast(u2, (entry.raw >> 45) & 0b11));
+            const dpl = @as(PrivilegeLevel, @enumFromInt(@as(u2, @intCast((entry.raw >> 45) & 0b11))));
             return SegmentSelector.new(self.free_slot - 1, dpl);
         }
 
@@ -109,11 +109,11 @@ pub fn GlobalDescriptorTable(comptime n: u16) type {
                 size: u16,
                 base: u64,
             }{
-                .base = @ptrToInt(&self.entries),
+                .base = @intFromPtr(&self.entries),
                 .size = @sizeOf(@TypeOf(self.entries)) - 1,
             };
 
-            x86.lgdt(@ptrToInt(&descriptor));
+            x86.lgdt(@intFromPtr(&descriptor));
         }
 
         pub fn reload_cs(_: Self, selector: SegmentSelector) void {

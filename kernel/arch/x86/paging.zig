@@ -100,7 +100,7 @@ pub const PT = struct {
     pub inline fn get_slot(addr: VirtualAddress) IdxType {
         const pt_index = (addr.value >> 12) & 0x1ff;
         std.debug.assert(pt_index <= PT.MaxIndex);
-        return @intCast(PT.IdxType, pt_index);
+        return @intCast(pt_index);
     }
 };
 
@@ -236,7 +236,7 @@ pub const PD = struct {
     pub fn get_slot(addr: VirtualAddress) IdxType {
         const pd_index = (addr.value >> 21) & 0x1ff;
         std.debug.assert(pd_index <= PD.MaxIndex);
-        return @intCast(PD.IdxType, pd_index);
+        return @intCast(pd_index);
     }
 };
 
@@ -334,7 +334,7 @@ pub const PDPT = struct {
     pub fn get_slot(addr: VirtualAddress) IdxType {
         const pdpt_index = (addr.value >> 30) & 0x1ff;
         std.debug.assert(pdpt_index <= PDPT.MaxIndex);
-        return @intCast(PDPT.IdxType, pdpt_index);
+        return @intCast(pdpt_index);
     }
 };
 
@@ -443,6 +443,6 @@ pub const PML4 = struct {
     pub fn get_slot(addr: VirtualAddress) IdxType {
         const pml4_index_ = (addr.value >> 39) & 0x1ff;
         std.debug.assert(pml4_index_ <= PML4.MaxIndex);
-        return @intCast(PML4.IdxType, pml4_index_);
+        return @intCast(pml4_index_);
     }
 };

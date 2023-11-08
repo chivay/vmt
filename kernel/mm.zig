@@ -72,7 +72,7 @@ fn AddrWrapper(comptime name: []const u8, comptime T: type) type {
         }
 
         pub fn into_pointer(self: Self, comptime P: type) P {
-            return @intToPtr(P, self.value);
+            return @ptrFromInt(self.value);
         }
 
         pub fn add(self: Self, val: Type) Self {
@@ -263,7 +263,7 @@ pub const MemoryAllocator = struct {
         if (real_size <= self.main_chunk.?.len) {
             var result = self.main_chunk.?[0..real_size];
             var rest = self.main_chunk.?[real_size..];
-            self.main_chunk = @alignCast(16, rest);
+            self.main_chunk = @alignCast(rest);
             return result;
         }
         return error{OutOfMemory}.OutOfMemory;
@@ -271,7 +271,7 @@ pub const MemoryAllocator = struct {
 
     pub fn alloc(self: *Self, comptime T: type) !*T {
         const buffer = try self.alloc_bytes(@sizeOf(T));
-        return @ptrCast(*T, buffer);
+        return @ptrCast(buffer);
     }
     pub fn free(_: *u8) void {}
 };
@@ -324,7 +324,7 @@ pub const FrameAllocator = struct {
     pub fn alloc_frame(self: *Self) !PhysicalAddress {
         // Try allocating from freelist
         if (self.freelist.popFirst()) |node| {
-            const virt_addr = VirtualAddress.new(@ptrToInt(node));
+            const virt_addr = VirtualAddress.new(@intFromPtr(node));
             const phys_addr = directMapping().to_phys(virt_addr);
             return phys_addr;
         }
@@ -376,7 +376,7 @@ pub fn MemoryRange(comptime T: type) type {
         }
 
         pub fn as_bytes(self: Self) []u8 {
-            const ptr = @intToPtr([*]u8, self.base.value);
+            const ptr = @as([*]u8, @ptrFromInt(self.base.value));
             return ptr[0..(self.size)];
         }
     };

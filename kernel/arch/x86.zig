@@ -238,7 +238,7 @@ pub inline fn wrmsr(which: u32, value: u64) void {
     return asm volatile ("wrmsr"
         :
         : [high] "{edx}" (value >> 32),
-          [low] "{eax}" (@truncate(u32, value)),
+          [low] "{eax}" (@as(u32, @truncate(value))),
           [which] "{ecx}" (which),
     );
 }
@@ -290,8 +290,8 @@ pub const TaskRegs = packed struct {
         var reg_area = thread_stack[thread_stack.len - reg_area_size ..];
         var rip_area = reg_area[6 * @sizeOf(u64) ..];
         @memset(reg_area, 0);
-        std.mem.writeIntNative(u64, @ptrCast(*[8]u8, rip_area), @ptrToInt(func));
-        return TaskRegs{ .rsp = @ptrToInt(reg_area.ptr), .stack_bottom = @ptrToInt(reg_area.ptr) };
+        std.mem.writeInt(u64, @ptrCast(rip_area), @intFromPtr(func), .little);
+        return TaskRegs{ .rsp = @intFromPtr(reg_area.ptr), .stack_bottom = @intFromPtr(reg_area.ptr) };
     }
 
     pub fn format(self: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, stream: anytype) !void {
@@ -324,11 +324,11 @@ pub const InterruptDescriptorTable = extern struct {
             return .{
                 .raw = .{
                     .reserved__ = 0,
-                    .offset_low = @intCast(u16, addr & 0xffff),
-                    .offset_high = @intCast(u32, addr >> 32),
-                    .offset_mid = @intCast(u16, (addr >> 16) & 0xffff),
+                    .offset_low = @intCast(addr & 0xffff),
+                    .offset_high = @intCast(addr >> 32),
+                    .offset_mid = @intCast((addr >> 16) & 0xffff),
                     .ist = 0,
-                    .type_attr = 0b10001110 | (@as(u8, @enumToInt(dpl)) << 5),
+                    .type_attr = 0b10001110 | (@as(u8, @intFromEnum(dpl)) << 5),
                     .selector = code_selector.raw,
                 },
             };
@@ -346,11 +346,11 @@ pub const InterruptDescriptorTable = extern struct {
             size: u16,
             base: u64,
         }{
-            .base = @ptrToInt(&self.entries),
+            .base = @intFromPtr(&self.entries),
             .size = @sizeOf(@TypeOf(self.entries)) - 1,
         };
 
-        lidt(@ptrToInt(&descriptor));
+        lidt(@intFromPtr(&descriptor));
     }
 };
 
@@ -391,7 +391,7 @@ pub fn get_vendor_string() [12]u8 {
 
 pub fn get_maxphyaddr() u6 {
     const info = cpuid(0x80000008, 0);
-    return @truncate(u6, info.eax);
+    return @truncate(info.eax);
 }
 pub fn hang() noreturn {
     while (true) {
@@ -450,11 +450,11 @@ pub fn boot_entry() noreturn {
     kernel.logging.register_sink(&serial_node);
 
     kernel.task.init_task.regs.rsp = 0x2137;
-    kernel.task.init_task.regs.stack_bottom = @ptrToInt(&stack) + stack.len;
+    kernel.task.init_task.regs.stack_bottom = @intFromPtr(&stack) + stack.len;
     kernel.task.init_task.stack = &stack;
 
     // setup identity mapping
-    const VIRT_START = kernel.mm.VirtualAddress.new(@ptrToInt(&KERNEL_VIRT_BASE));
+    const VIRT_START = kernel.mm.VirtualAddress.new(@intFromPtr(&KERNEL_VIRT_BASE));
     const SIZE = lib.MiB(16);
     mm.directMapping().* = kernel.mm.DirectMapping.init(VIRT_START, SIZE);
 
@@ -506,7 +506,7 @@ pub fn setup_userspace() !void {
         "\x0f\x05" ++ // syscall
         "\xeb\xfc" // jmp to syscall
     ;
-    std.mem.copy(u8, @intToPtr([*]u8, userspace_location)[0..0x1000], program);
+    std.mem.copy(u8, @as([*]u8, @ptrFromInt(userspace_location))[0..0x1000], program);
 }
 
 pub fn enter_userspace() void {
@@ -584,7 +584,7 @@ pub inline fn getCoreBlock() *CoreBlock {
     const blockptr = asm volatile ("mov %%gs:0x0,%[ret]"
         : [ret] "={rax}" (-> u64),
     );
-    return @intToPtr(*CoreBlock, blockptr);
+    return @ptrFromInt(blockptr);
 }
 
 /// Generate stub for n-th exception
@@ -926,7 +926,7 @@ comptime {
 }
 
 fn keyboard_echo() void {
-    const scancode = @intToEnum(keyboard.Scancode, in(u8, 0x60));
+    const scancode: keyboard.Scancode = @enumFromInt(in(u8, 0x60));
     if (scancode.to_ascii()) |c| {
         switch (c) {
             else => {},
@@ -983,16 +983,16 @@ fn handle_page_fault(addr: u64) void {
 export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFrame) callconv(.C) void {
     _ = error_code;
     switch (interrupt_num) {
-        @enumToInt(CpuException.Breakpoint) => {
+        @intFromEnum(CpuException.Breakpoint) => {
             logger.log("BREAKPOINT\n", .{});
             logger.log("======================\n", .{});
             logger.log("{x}\n", .{frame});
             logger.log("======================\n", .{});
         },
-        @enumToInt(CpuException.GeneralProtectionFault) => {
+        @intFromEnum(CpuException.GeneralProtectionFault) => {
             @panic("General Protection Fault");
         },
-        @enumToInt(CpuException.PageFault) => {
+        @intFromEnum(CpuException.PageFault) => {
             logger.log("{}\n", .{frame});
             handle_page_fault(CR2.read());
         },
@@ -1027,7 +1027,7 @@ const exception_stubs = init: {
 };
 
 pub fn switch_task(from: *kernel.task.Task, to: *kernel.task.Task) void {
-    main_tss.rsp[0] = @ptrToInt(to.stack.ptr) + to.stack.len;
+    main_tss.rsp[0] = @intFromPtr(to.stack.ptr) + to.stack.len;
     asm_switch_task(&from.regs, &to.regs);
 }
 
@@ -1088,14 +1088,14 @@ fn setup_syscall() void {
 
     EFER.write(EFER.read() | 1);
 
-    main_tss.rsp[0] = @ptrToInt(&stack[0]) + stack.len;
+    main_tss.rsp[0] = @intFromPtr(&stack[0]) + stack.len;
     // Setup sysret instruction
     // Stack segment — IA32_STAR[63:48] + 8.
     // Target code segment — Reads a non-NULL selector from IA32_STAR[63:48] + 16.
     const sysret_selector = @as(u64, user_base.raw);
     const syscall_selector = @as(u64, null_entry.raw);
     IA32_STAR.write((sysret_selector << 48) | (syscall_selector << 32));
-    IA32_LSTAR.write(@ptrToInt(&syscall_entry));
+    IA32_LSTAR.write(@intFromPtr(&syscall_entry));
 }
 
 pub var null_entry: gdt.SegmentSelector = undefined;

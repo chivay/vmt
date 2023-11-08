@@ -9,7 +9,7 @@ var mmio_base: PhysicalAddress = undefined;
 
 fn mmio_read(comptime T: type, addr: PhysicalAddress) T {
     const addr_virt = kernel.mm.directTranslate(addr);
-    const mmio_addr = @intToPtr(*volatile T, addr_virt.value);
+    const mmio_addr = @as(*volatile T, @ptrFromInt(addr_virt.value));
     return mmio_addr.*;
 }
 

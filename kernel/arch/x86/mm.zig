@@ -47,7 +47,7 @@ const KERNEL_IMAGE = mm.VirtualMemoryRange.sized(
 pub extern var kernel_end: [*]u8;
 
 pub fn get_kernel_end() mm.VirtualAddress {
-    return mm.VirtualAddress.new(@ptrToInt(&kernel_end));
+    return mm.VirtualAddress.new(@intFromPtr(&kernel_end));
 }
 
 var direct_mapping: mm.DirectMapping = undefined;
@@ -424,7 +424,7 @@ pub const VirtualMemoryImpl = struct {
 pub var kernel_vm_impl: VirtualMemoryImpl = undefined;
 
 fn map_kernel_image(vm: *mm.VirtualMemory) !void {
-    const kern_end = VirtualAddress.new(@ptrToInt(&kernel_end));
+    const kern_end = VirtualAddress.new(@intFromPtr(&kernel_end));
     const kernel_size = VirtualAddress.span(KERNEL_IMAGE.base, kern_end);
     _ = vm.map_memory(
         KERNEL_IMAGE.base,

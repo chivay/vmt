@@ -32,7 +32,7 @@ pub const UART = struct {
     }
 
     fn recv_byte() u8 {
-        return @truncate(u8, MINI_UART.IO.read());
+        return @truncate(MINI_UART.IO.read());
     }
 
     fn can_send() bool {

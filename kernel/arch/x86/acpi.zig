@@ -185,14 +185,14 @@ pub const MCFGIterator = struct {
 
     pub fn next(self: *@This()) ?*const MCFGEntry {
         if (self.data.len < @sizeOf(MCFGEntry)) return null;
-        const entry = @ptrCast(*const MCFGEntry, self.data);
+        const entry = @as(*const MCFGEntry,  @ptrCast(self.data));
         self.data = self.data[@sizeOf(MCFGEntry)..];
         return entry;
     }
 
     pub fn init(header: *SDTHeader) MCFGIterator {
         const data_length = header.length - @sizeOf(SDTHeader) - 8;
-        var data = @intToPtr([*]u8, @ptrToInt(header) + @sizeOf(SDTHeader) + 8)[0..data_length];
+        var data = @as([*]u8, @ptrFromInt(@intFromPtr(header) + @sizeOf(SDTHeader) + 8))[0..data_length];
         return .{ .data = data };
     }
 };
@@ -243,7 +243,7 @@ pub const MADTIterator = struct {
 
     pub fn next(self: *@This()) ?*const MADTHeader {
         if (self.data.len >= @sizeOf(MADTHeader)) {
-            const madt_header = @ptrCast(*const MADTHeader, self.data.ptr);
+            const madt_header = @as(*const MADTHeader, @ptrCast(self.data.ptr));
             self.data = self.data[madt_header.record_length..];
             return madt_header;
         }
@@ -256,7 +256,7 @@ pub const MADTIterator = struct {
 
     pub fn init(header: *SDTHeader) MADTIterator {
         const data_length = header.length - @sizeOf(SDTHeader);
-        var data = @intToPtr([*]u8, @ptrToInt(header) + @sizeOf(SDTHeader))[0..data_length];
+        var data = @as([*]u8,@ptrFromInt(@intFromPtr(header) + @sizeOf(SDTHeader)))[0..data_length];
         var entry_data = data[@sizeOf(MADTInfo)..];
 
         return .{ .data = entry_data };
@@ -296,7 +296,7 @@ const SDTIterator = struct {
     }
 
     pub fn init(rsdt: *SDTHeader) SDTIterator {
-        return .{ .data = @ptrCast([*]u8, rsdt)[@sizeOf(SDTHeader)..rsdt.length] };
+        return .{ .data = @as([*]u8, @ptrCast(rsdt))[@sizeOf(SDTHeader)..rsdt.length] };
     }
 };
 

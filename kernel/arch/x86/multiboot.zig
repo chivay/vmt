@@ -42,7 +42,7 @@ pub const TagType = enum(u32) {
     _,
 
     pub fn v(self: @This()) u32 {
-        return @enumToInt(self);
+        return @intFromEnum(self);
     }
 };
 
@@ -67,9 +67,9 @@ pub const Header = extern struct {
 
     pub fn init(arch: Arch, length: u32) Header {
         return .{
-            .architecture = @enumToInt(arch),
+            .architecture = @intFromEnum(arch),
             .header_length = length,
-            .checksum = 0 -% (MAGIC + length + @enumToInt(arch)),
+            .checksum = 0 -% (MAGIC + length + @intFromEnum(arch)),
         };
     }
 
@@ -150,7 +150,7 @@ export fn multiboot_entry(info: u32, magic: u32) callconv(.C) noreturn {
     asm volatile (
         \\ jmp *%[target]
         :
-        : [stack] "{rsp}" (@ptrToInt(&x86.stack) + @sizeOf(@TypeOf(x86.stack))),
+        : [stack] "{rsp}" (@intFromPtr(&x86.stack) + @sizeOf(@TypeOf(x86.stack))),
           [target] "{rax}" (&x86.boot_entry),
     );
     unreachable;
@@ -175,7 +175,7 @@ fn get_multiboot_tag(tag: TagType) ?[]u8 {
             const chunk = buffer[0..@sizeOf(BootInfoHeader)];
             header = std.mem.bytesAsValue(BootInfoHeader, chunk);
 
-            const tagt = @intToEnum(TagType, header.typ);
+            const tagt: TagType = @enumFromInt(header.typ);
             if (tagt == tag) {
                 return buffer[0..header.size];
             }

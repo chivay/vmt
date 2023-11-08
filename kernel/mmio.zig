@@ -8,11 +8,11 @@ pub fn MMIORegion(comptime base: u64, comptime T: type) type {
             return struct {
                 const addr = base + offset;
                 pub fn read() T {
-                    return @intToPtr(*volatile T, addr).*;
+                    return @as(*volatile T, @ptrFromInt(addr)).*;
                 }
 
                 pub fn write(value: T) void {
-                    @intToPtr(*volatile T, addr).* = value;
+                    @as(*volatile T, @ptrFromInt(addr)).* = value;
                 }
             };
         }
@@ -25,11 +25,11 @@ pub fn MMIORegister(comptime T: type) type {
         offset: u64,
 
         pub fn read(self: @This()) T {
-            return @intToPtr(*volatile T, self.mmio_region.base + self.offset).*;
+            return @as(*volatile T, @ptrFromInt(self.mmio_region.base + self.offset)).*;
         }
 
         pub fn write(self: @This(), value: T) void {
-            @intToPtr(*volatile T, self.mmio_region.base + self.offset).* = value;
+            @as(*volatile T, @ptrFromInt(self.mmio_region.base + self.offset)).* = value;
         }
     };
 }
