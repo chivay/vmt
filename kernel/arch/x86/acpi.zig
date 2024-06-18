@@ -192,7 +192,7 @@ pub const MCFGIterator = struct {
 
     pub fn init(header: *SDTHeader) MCFGIterator {
         const data_length = header.length - @sizeOf(SDTHeader) - 8;
-        var data = @as([*]u8, @ptrFromInt(@intFromPtr(header) + @sizeOf(SDTHeader) + 8))[0..data_length];
+        const data = @as([*]u8, @ptrFromInt(@intFromPtr(header) + @sizeOf(SDTHeader) + 8))[0..data_length];
         return .{ .data = data };
     }
 };
@@ -257,7 +257,7 @@ pub const MADTIterator = struct {
     pub fn init(header: *SDTHeader) MADTIterator {
         const data_length = header.length - @sizeOf(SDTHeader);
         var data = @as([*]u8, @ptrFromInt(@intFromPtr(header) + @sizeOf(SDTHeader)))[0..data_length];
-        var entry_data = data[@sizeOf(MADTInfo)..];
+        const entry_data = data[@sizeOf(MADTInfo)..];
 
         return .{ .data = entry_data };
     }

@@ -77,9 +77,9 @@ pub const VGADevice = struct {
         var i: u16 = 1;
         while (i < VGADevice.VGA_HEIGHT) : (i += 1) {
             // Copy ith row into i-1th row
-            var dest = get_buffer()[i - 1][0..];
-            var src = get_buffer()[i][0..];
-            std.mem.copy(u16, dest, src);
+            const dest = get_buffer()[i - 1][0..];
+            const src = get_buffer()[i][0..];
+            @memcpy(dest, src);
         }
 
         clear_row(VGADevice.VGA_HEIGHT - 1);

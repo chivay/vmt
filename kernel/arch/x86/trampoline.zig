@@ -16,7 +16,7 @@ pub fn get_nth_section(header: *const elf.Header, file: anytype, idx: u16) ?elf.
 
     var cnt: u16 = 0;
     while (true) : (cnt += 1) {
-        var value = sec_it.next() catch @panic("xd");
+        const value = sec_it.next() catch @panic("xd");
         if (value == null) break;
 
         if (cnt == idx) {

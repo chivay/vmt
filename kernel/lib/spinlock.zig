@@ -13,7 +13,7 @@ pub const SpinLock = struct {
         spinlock: *SpinLock,
 
         pub inline fn release(self: Held) void {
-            @atomicStore(State, &self.spinlock.state, .Unlocked, .Release);
+            @atomicStore(State, &self.spinlock.state, .Unlocked, .release);
         }
     };
 
@@ -22,7 +22,7 @@ pub const SpinLock = struct {
     }
 
     pub inline fn tryAcquire(self: *SpinLock) ?Held {
-        return switch (@atomicRmw(State, &self.state, .Xchg, .Locked, .Acquire)) {
+        return switch (@atomicRmw(State, &self.state, .Xchg, .Locked, .acquire)) {
             .Unlocked => Held{ .spinlock = self },
             .Locked => null,
         };

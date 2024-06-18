@@ -197,7 +197,7 @@ const LapicIterator = struct {
 };
 
 fn iterLapic() LapicIterator {
-    var it = x86.acpi.iterMADT();
+    const it = x86.acpi.iterMADT();
     return LapicIterator.init(it);
 }
 

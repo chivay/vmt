@@ -68,7 +68,7 @@ pub fn GlobalDescriptorTable(comptime n: u16) type {
 
             pub fn TaskState(tss: *TSS) [2]Entry {
                 var high: u64 = 0;
-                var ptr = @intFromPtr(tss);
+                const ptr = @intFromPtr(tss);
 
                 var low: u64 = 0;
                 low |= PRESENT;
@@ -91,7 +91,7 @@ pub fn GlobalDescriptorTable(comptime n: u16) type {
         const Self = @This();
 
         pub fn new() Self {
-            var gdt = Self{ .entries = std.mem.zeroes([n]Entry), .free_slot = 0 };
+            const gdt = Self{ .entries = std.mem.zeroes([n]Entry), .free_slot = 0 };
             return gdt;
         }
 

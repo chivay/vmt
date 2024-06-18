@@ -8,7 +8,7 @@ pub var logger = @TypeOf(x86.logger).childOf(@typeName(@This())){};
 var framebuffer: ?[]u8 = undefined;
 
 pub fn init() void {
-    var fb = x86.multiboot.get_framebuffer() orelse {
+    const fb = x86.multiboot.get_framebuffer() orelse {
         logger.info("Missing framebuffer info\n", .{});
         return;
     };

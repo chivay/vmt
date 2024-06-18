@@ -385,7 +385,7 @@ pub fn get_vendor_string() [12]u8 {
     const vals = [_]u32{ info.ebx, info.edx, info.ecx };
 
     var result: [@sizeOf(@TypeOf(vals))]u8 = undefined;
-    std.mem.copy(u8, &result, std.mem.asBytes(&vals));
+    @memcpy(&result, std.mem.asBytes(&vals));
     return result;
 }
 
@@ -506,7 +506,7 @@ pub fn setup_userspace() !void {
         "\x0f\x05" ++ // syscall
         "\xeb\xfc" // jmp to syscall
     ;
-    std.mem.copy(u8, @as([*]u8, @ptrFromInt(userspace_location))[0..0x1000], program);
+    @memcpy(@as([*]u8, @ptrFromInt(userspace_location))[0..program.len], program);
 }
 
 pub fn enter_userspace() void {
