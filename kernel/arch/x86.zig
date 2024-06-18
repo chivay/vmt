@@ -288,7 +288,7 @@ pub const TaskRegs = packed struct {
         // 7 == #saved registers + return address
         const reg_area_size = @sizeOf(u64) * 7;
         var reg_area = thread_stack[thread_stack.len - reg_area_size ..];
-        var rip_area = reg_area[6 * @sizeOf(u64) ..];
+        const rip_area = reg_area[6 * @sizeOf(u64) ..];
         @memset(reg_area, 0);
         std.mem.writeInt(u64, @ptrCast(rip_area), @intFromPtr(func), .little);
         return TaskRegs{ .rsp = @intFromPtr(reg_area.ptr), .stack_bottom = @intFromPtr(reg_area.ptr) };
@@ -955,7 +955,7 @@ pub fn register_irq_handler(irq: u8, reg: *IrqRegistration) !void {
 }
 
 pub fn unregister_irq_handler(irq: u8, reg: *IrqRegistration) !void {
-    var current = handlers[irq];
+    const current = handlers[irq];
     if (current) |registration| {
         if (registration == reg) {
             handlers[irq] = reg.next;
@@ -1017,7 +1017,7 @@ export fn hello_handler(interrupt_num: u8, error_code: u64, frame: *InterruptFra
 
 const exception_stubs = init: {
     @setEvalBranchQuota(100000);
-    var stubs: [256]InterruptStub = undefined;
+    const stubs: [256]InterruptStub = undefined;
 
     for (stubs, 0..) |*pt, i| {
         pt.* = &exception_stub(i);

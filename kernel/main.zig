@@ -29,13 +29,13 @@ pub fn kmain() void {
 
     const Task = task.Task;
 
-    var taskA = Task.create(&usermode) catch {
+    const taskA = Task.create(&usermode) catch {
         @panic("Failed to allocate a task");
     };
-    var taskB = Task.create(&usermode) catch {
+    const taskB = Task.create(&usermode) catch {
         @panic("Failed to allocate a task");
     };
-    var taskC = Task.create(&worker2) catch {
+    const taskC = Task.create(&worker2) catch {
         @panic("Failed to allocate a task");
     };
 

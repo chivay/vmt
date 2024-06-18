@@ -14,8 +14,8 @@ pub const Task = struct {
     const Self = @This();
     pub const NextNode = std.TailQueue(void).Node;
     pub fn create(func: *const fn () noreturn) !*Task {
-        var task = try mm.memoryAllocator().alloc(Task);
-        var stack = try mm.memoryAllocator().alloc([arch.KERNEL_STACK_SIZE]u8);
+        const task = try mm.memoryAllocator().alloc(Task);
+        const stack = try mm.memoryAllocator().alloc([arch.KERNEL_STACK_SIZE]u8);
         task.regs = arch.TaskRegs.setup(func, stack);
         task.stack = stack;
         task.next = NextNode{ .next = null, .data = {} };
@@ -67,7 +67,7 @@ pub const Scheduler = struct {
 
     pub fn reschedule(self: *Self) *Task {
         if (self.task_list.popFirst()) |node| {
-            var task: *Task = @fieldParentPtr(Task, "next", node);
+            const task: *Task = @fieldParentPtr("next", node);
             return task;
         }
         @panic("Nothing to schedule!");

@@ -192,16 +192,16 @@ pub const VirtualMemory = struct {
     };
 
     pub fn alloc_new() !*VirtualMemory {
-        var vm = try memoryAllocator().alloc(VirtualMemory);
-        var arch_vm = try memoryAllocator().alloc(arch.mm.VirtualMemoryImpl);
+        const vm = try memoryAllocator().alloc(VirtualMemory);
+        const arch_vm = try memoryAllocator().alloc(arch.mm.VirtualMemoryImpl);
         arch_vm.* = try arch.mm.VirtualMemoryImpl.init(frameAllocator());
         vm.* = VirtualMemory.init(arch_vm);
         return vm;
     }
 
     pub fn clone(source: *VirtualMemory) !*VirtualMemory {
-        var vm = try memoryAllocator().alloc(VirtualMemory);
-        var arch_vm = try arch.mm.VirtualMemoryImpl.clone(source.vm_impl);
+        const vm = try memoryAllocator().alloc(VirtualMemory);
+        const arch_vm = try arch.mm.VirtualMemoryImpl.clone(source.vm_impl);
         vm.* = VirtualMemory.init(arch_vm);
         return vm;
     }
@@ -248,7 +248,7 @@ pub const MemoryAllocator = struct {
     }
 
     pub fn alloc_bytes(self: *Self, size: usize) ![]align(0x10) u8 {
-        var real_size = std.mem.alignForward(usize, size, 0x10);
+        const real_size = std.mem.alignForward(usize, size, 0x10);
 
         if (self.main_chunk == null or self.main_chunk.?.len < real_size) {
             const frame = (try self.frame_allocator.alloc_frame());
@@ -261,8 +261,8 @@ pub const MemoryAllocator = struct {
         }
 
         if (real_size <= self.main_chunk.?.len) {
-            var result = self.main_chunk.?[0..real_size];
-            var rest = self.main_chunk.?[real_size..];
+            const result = self.main_chunk.?[0..real_size];
+            const rest = self.main_chunk.?[real_size..];
             self.main_chunk = @alignCast(rest);
             return result;
         }
