@@ -3,11 +3,13 @@ const std = @import("std");
 const Arch = std.Target.Cpu.Arch;
 const CrossTarget = std.zig.CrossTarget;
 const CpuFeature = std.Target.Cpu.Feature;
-const Builder = std.build.Builder;
+const Build = std.Build;
 
-pub fn build(b: *Builder, kernel: *std.build.LibExeObjStep) void {
+pub fn build(b: *Build) void {
     const builder = b;
     var kernel_tls = builder.step("kernel", "Build kernel ELF");
+
+    const optimize = b.standardOptimizeOption(.{});
 
     const cross_target = CrossTarget{
         .cpu_arch = Arch.x86_64,
@@ -33,8 +35,13 @@ pub fn build(b: *Builder, kernel: *std.build.LibExeObjStep) void {
         .os_tag = std.Target.Os.Tag.freestanding,
         .abi = std.Target.Abi.none,
     };
-    kernel.target = cross_target;
-    kernel.code_model = std.builtin.CodeModel.kernel;
+    const kernel = b.addExecutable(.{
+        .name = "kernel",
+        .target = b.resolveTargetQuery(cross_target),
+        .code_model = .kernel,
+        .root_source_file = .{.path = "kernel/kernel.zig"},
+        .optimize = optimize,
+    });
     kernel.want_lto = false;
 
     kernel.setLinkerScriptPath(.{ .path = "kernel/arch/x86/linker.ld" });
@@ -46,7 +53,7 @@ pub fn build(b: *Builder, kernel: *std.build.LibExeObjStep) void {
     const trampolines = builder.addAssembly(.{
         .name = "trampolines",
         .source_file = .{ .path = "kernel/arch/x86/trampolines.S" },
-        .target = cross_target,
+        .target = b.resolveTargetQuery(cross_target),
         .optimize = .Debug,
     });
     //trampolines.setOutputDir("build/x86_64");

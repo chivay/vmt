@@ -15,7 +15,7 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           zigpkgs = zig.packages.${system};
-          vmtZig = zigpkgs."master";
+          vmtZig = zigpkgs."0.12.0";
         in
         {
           defaultPackage = self.outputs.packages.${system}.vmt;
